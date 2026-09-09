@@ -1,0 +1,256 @@
+/* Import syntax highlighting styles for code blocks */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom animations for logout */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes headerWaveHand {
+  0%  { transform: rotate(0deg); }
+  10% { transform: rotate(14deg); }
+  20% { transform: rotate(-8deg); }
+  30% { transform: rotate(14deg); }
+  40% { transform: rotate(-4deg); }
+  50% { transform: rotate(10deg); }
+  60% { transform: rotate(0deg); }
+  100%{ transform: rotate(0deg); }
+}
+
+.animate-pulse {
+  animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-wave-hand {
+  display: inline-block;
+  animation: headerWaveHand 2.5s ease-in-out infinite;
+  transform-origin: 70% 70%;
+}
+
+.delay-0 {
+  animation-delay: 0ms;
+}
+
+.delay-150 {
+  animation-delay: 150ms;
+}
+
+.delay-300 {
+  animation-delay: 300ms;
+}
+
+/* Overlay for logout */
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(244, 248, 249, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(3px);
+  transition: all 0.3s ease-in-out;
+}
+
+@layer base {
+  :root {
+    /* Paper & Teal — cool academic LMS tokens → HSL channels for shadcn */
+    --background: 195 20% 97%;           /* #F4F8F9 */
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 173 78% 26%;              /* #0F766E deep teal */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 195 14% 91%;            /* #E4EBEE muted paper */
+    --secondary-foreground: 222 47% 11%;
+    --muted: 195 18% 95%;                /* #EEF3F5 subtle */
+    --muted-foreground: 215 16% 40%;
+    --accent: 195 18% 95%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 72% 42%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 195 14% 86%;               /* #D4DEE3 */
+    --input: 195 14% 86%;
+    --ring: 173 78% 26%;                 /* deep teal focus */
+    --radius: 0.5rem;
+    --radius-card: 1.5rem;
+
+    --sidebar-background: 195 16% 93%;   /* #E8EEF1 */
+    --sidebar-foreground: 215 25% 27%;
+    --sidebar-primary: 173 78% 26%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 195 18% 95%;
+    --sidebar-accent-foreground: 215 25% 27%;
+    --sidebar-border: 195 14% 86%;
+    --sidebar-ring: 173 78% 26%;
+
+    --chart-1: 173 78% 26%;
+    --chart-2: 199 89% 31%;
+    --chart-3: 215 16% 40%;
+    --chart-4: 188 78% 30%;
+    --chart-5: 173 58% 35%;
+
+    --shadow-card: 0 10px 30px rgba(15, 23, 42, 0.04);
+    --color-brand-blue: #0E7490;
+    --color-turquoise: #0F766E;
+    --color-primary-main: #0F766E;
+    --color-primary-light: #14B8A6;
+    --color-primary-dark: #115E59;
+    --color-primary-subtle: #CCFBF1;
+    --color-secondary-main: #5B7C8D;
+    --color-bg-default: #F4F8F9;
+    --color-bg-muted: #E4EBEE;
+    --color-bg-sidebar: #E8EEF1;
+    --color-border-subtle: #E8EEF2;
+    --color-text-primary: #1E293B;
+    --color-text-muted: #64748B;
+    --brand-blue: 199 89% 31%;
+    --brand-coral: 199 21% 45%;
+    --brand-lavender: 215 16% 34%;
+    --brand-mint: 173 80% 32%;
+    --brand-sunshine: 215 16% 65%;
+    --font-body: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --drawer-width: 280px;
+    --drawer-width-collapsed: 88px;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-size: 16px;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground text-base leading-relaxed;
+    font-family: var(--font-body);
+    font-feature-settings: "kern" 1, "liga" 1;
+    letter-spacing: -0.011em;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+  }
+}
+
+@layer utilities {
+  .bg-app-main {
+    background: var(--color-bg-default, #F4F8F9);
+  }
+
+  .bg-accent-brand {
+    background-image: linear-gradient(
+      135deg,
+      hsl(var(--primary)) 0%,
+      var(--color-brand-blue, #0E7490) 100%
+    );
+  }
+
+  .bg-sidebar-warm {
+    background: var(--color-bg-sidebar, #E8EEF1);
+  }
+
+  .icon-rail-active {
+    background: var(--color-primary-subtle, #CCFBF1);
+    color: var(--color-primary-main, #0F766E);
+  }
+
+  .stat-tile {
+    background: var(--color-primary-subtle, #CCFBF1);
+    border-radius: calc(var(--radius) - 2px);
+  }
+
+  .progress-track {
+    height: 5px;
+    border-radius: 999px;
+    background: hsl(var(--border));
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: hsl(var(--primary));
+  }
+
+  .shadow-card-soft {
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+  }
+
+  .glass-appbar {
+    background-color: rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+  }
+}
+
+/* Custom styles for markdown content in the chat interface */
+.prose pre {
+  @apply rounded-md mt-2 mb-4 p-0 overflow-hidden;
+}
+
+.prose pre code {
+  @apply block p-4;
+}
+
+.prose code:not(pre code) {
+  @apply bg-muted px-1.5 py-0.5 rounded text-sm font-medium;
+}
+
+.prose table {
+  @apply border-collapse w-full my-4;
+}
+
+.prose table th,
+.prose table td {
+  @apply border border-border p-2 text-sm;
+}
+
+.prose table th {
+  @apply bg-muted font-medium;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-primary/30 pl-4 py-1 my-4 italic;
+}
+
+.bg-primary .prose {
+  @apply text-primary-foreground;
+}
+
+.bg-primary .prose a {
+  @apply text-primary-foreground underline;
+}
+
+.bg-primary .prose code:not(pre code) {
+  @apply bg-primary-foreground/20 text-primary-foreground;
+}
+
+.prose-sm pre {
+  @apply text-xs;
+}
+
+.prose-sm pre code {
+  @apply p-3;
+}
+
+.prose-sm code:not(pre code) {
+  @apply text-xs;
+}
