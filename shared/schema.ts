@@ -2,6 +2,9 @@ import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date, time, 
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const examTypeSchema = z.enum(["theory", "mcq"]);
+export type ExamType = z.infer<typeof examTypeSchema>;
+
 // Tenant model
 export const tenants = pgTable("tenants", {
   id: serial("id").primaryKey(),

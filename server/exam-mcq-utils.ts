@@ -1,12 +1,16 @@
-import type { Question } from "@shared/schema";
-import type { ExamType } from "@shared/schema";
+import type { Question, ExamType } from "@shared/schema";
+
+type McqQuestion = Question & {
+  options?: string[] | null;
+  correctOption?: number | null;
+};
 
 export function normalizeExamType(value: unknown): ExamType {
   return value === "mcq" ? "mcq" : "theory";
 }
 
-export function stripQuestionForStudent(q: Question) {
-  const { modelAnswer, correctOption, ...rest } = q;
+export function stripQuestionForStudent(q: Question | McqQuestion) {
+  const { modelAnswer, correctOption, options, ...rest } = q as McqQuestion;
   return rest;
 }
 
@@ -57,7 +61,7 @@ export function validateMcqQuestionPayload(
 }
 
 export function gradeMcqAnswers(
-  questions: Question[],
+  questions: Array<Question | McqQuestion>,
   answersRaw: unknown
 ): {
   score: number;
@@ -76,14 +80,16 @@ export function gradeMcqAnswers(
     answers = answersRaw as Record<string, string>;
   }
 
-  const gradable = questions.filter(
-    (q) =>
-      Array.isArray(q.options) &&
-      q.options.length >= 2 &&
-      q.correctOption != null &&
-      q.correctOption >= 0 &&
-      q.correctOption < (q.options as string[]).length
-  );
+  const gradable = questions.filter((q): q is McqQuestion => {
+    const item = q as McqQuestion;
+    return (
+      Array.isArray(item.options) &&
+      item.options.length >= 2 &&
+      item.correctOption != null &&
+      item.correctOption >= 0 &&
+      item.correctOption < item.options.length
+    );
+  });
 
   let score = 0;
   const questionResults: Record<number, boolean> = {};

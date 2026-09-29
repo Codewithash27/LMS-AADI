@@ -21,7 +21,16 @@ import {
   Clock,
   ImageIcon,
   X,
+  PenLine,
+  ListChecks,
+  Check,
 } from "lucide-react";
+import {
+  OPTION_LETTERS,
+  normalizeExamType,
+  validateMcqQuestionClient,
+  normalizeMcqOptions,
+} from "@/lib/exam-mcq";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
@@ -53,16 +62,18 @@ type QuestionType = {
   order: number;
   modelAnswer?: string | null;
   imageUrl?: string | null;
+  options?: string[];
+  correctOption?: number | null;
 };
 
 type ParsedPdfQuestion = {
   text: string;
   modelAnswer?: string | null;
   imageUrl?: string | null;
+  options?: string[];
+  correctOption?: number;
 };
 
-<<<<<<< HEAD
-=======
 const DEFAULT_MCQ_OPTIONS = ["", "", "", ""];
 
 function ensureMcqOptions(q: QuestionType): QuestionType {
@@ -91,7 +102,6 @@ function buildQuestionsFromPool(
   });
 }
 
->>>>>>> 6ad5e77615f716cf66ed0d0cf43601bb0ae769d2
 type ExamEditorProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -110,6 +120,7 @@ type ExamEditorProps = {
     batchId?: number | null;
     duration?: number;
     acceptingResponses?: boolean;
+    examType?: string;
   };
 };
 
@@ -162,6 +173,7 @@ export default function ExamEditor({
   const form = useForm<ExamFormValues>({
     resolver: zodResolver(examFormSchema),
     defaultValues: {
+      examType: "theory" as const,
       title: "",
       description: "",
       courseId: "",
@@ -174,6 +186,7 @@ export default function ExamEditor({
   });
 
   const selectedCourseId = form.watch("courseId");
+  const examType = form.watch("examType");
   const questionSource = form.watch("questionSource");
   const questionCount = form.watch("questionCount");
 
@@ -185,6 +198,7 @@ export default function ExamEditor({
   useEffect(() => {
     if (fetchedExam && exam?.id) {
       form.reset({
+        examType: normalizeExamType(fetchedExam.examType),
         title: fetchedExam.title,
         description: fetchedExam.description,
         courseId: String(fetchedExam.courseId),
@@ -196,6 +210,7 @@ export default function ExamEditor({
       });
     } else if (!exam?.id && open) {
       form.reset({
+        examType: "theory",
         title: "",
         description: "",
         courseId: "",
@@ -213,31 +228,23 @@ export default function ExamEditor({
 
   useEffect(() => {
     if (examQuestions && exam?.id) {
-      setQuestions(examQuestions);
+      const type = normalizeExamType(fetchedExam?.examType);
+      setQuestions(
+        (examQuestions as QuestionType[]).map((q) =>
+          type === "mcq" ? ensureMcqOptions(q) : q
+        )
+      );
     } else if (!exam?.id) {
       setQuestions([]);
     }
-  }, [examQuestions, exam?.id]);
+  }, [examQuestions, exam?.id, fetchedExam?.examType]);
 
   // Note: Batch validation is now done on the backend
   // Users can select any batch, and the server will validate if the course is assigned to that batch
 
   const applyRandomFromPoolWith = (pool: ParsedPdfQuestion[], count: number) => {
-<<<<<<< HEAD
-    const picked = shufflePick(pool, count);
-    setQuestions(
-      picked.map((q, index) => ({
-        id: index + 1,
-        text: q.text,
-        order: index,
-        modelAnswer: q.modelAnswer ?? null,
-        imageUrl: q.imageUrl ?? null,
-      }))
-    );
-=======
     const isMcq = form.getValues("examType") === "mcq";
     setQuestions(buildQuestionsFromPool(pool, count, isMcq));
->>>>>>> 6ad5e77615f716cf66ed0d0cf43601bb0ae769d2
   };
 
   const applyRandomFromPool = (count?: number) => {
@@ -295,10 +302,17 @@ export default function ExamEditor({
       form.setValue("questionCount", defaultCount);
       applyRandomFromPoolWith(parsed, defaultCount);
 
-      toast({
-        title: "Document parsed",
-        description: `Found ${parsed.length} questions. ${defaultCount} randomly selected for this exam.`,
-      });
+      const stats = data.parseStats as
+        | { total: number; withOptions: number; withCorrect: number }
+        | undefined;
+      let desc = `Found ${parsed.length} questions. ${defaultCount} randomly selected for this exam.`;
+      if (form.getValues("examType") === "mcq" && stats) {
+        desc += ` Options detected for ${stats.withOptions}, correct answer for ${stats.withCorrect}.`;
+        if (stats.withOptions === 0) {
+          desc += " Tip: use A) B) C) D) lines and Answer: B.";
+        }
+      }
+      toast({ title: "Document parsed", description: desc });
     } catch (error: any) {
       toast({
         title: "Document parse failed",
@@ -376,8 +390,6 @@ export default function ExamEditor({
       return;
     }
 
-<<<<<<< HEAD
-=======
     if (data.examType === "mcq") {
       for (let i = 0; i < questionsToSave.length; i++) {
         const err = validateMcqQuestionClient(
@@ -393,7 +405,6 @@ export default function ExamEditor({
       }
     }
 
->>>>>>> 6ad5e77615f716cf66ed0d0cf43601bb0ae769d2
     setIsSaving(true);
     try {
       const payload = {
@@ -403,6 +414,7 @@ export default function ExamEditor({
         duration: Number(data.duration),
         batchId: data.batchId && data.batchId !== "none" ? parseInt(data.batchId, 10) : null,
         acceptingResponses: data.acceptingResponses,
+        examType: data.examType,
       };
 
       let examId: number;
@@ -424,14 +436,11 @@ export default function ExamEditor({
         });
       }
 
+      let questionsSaved = true;
       if (examId) {
         try {
           await apiRequest("DELETE", `/api/exams/${examId}/questions`);
 
-<<<<<<< HEAD
-          for (let index = 0; index < questions.length; index++) {
-            const question = questions[index];
-=======
           for (let index = 0; index < questionsToSave.length; index++) {
             const question = questionsToSave[index];
             let text = question.text;
@@ -453,20 +462,23 @@ export default function ExamEditor({
               if (lines.length) text = `${text.trim()}\n${lines.join("\n")}`.trim();
             }
 
->>>>>>> 6ad5e77615f716cf66ed0d0cf43601bb0ae769d2
             await apiRequest("POST", `/api/exams/${examId}/questions`, {
-              text: question.text,
+              text,
               order: index,
               examId,
-              modelAnswer: question.modelAnswer || null,
+              modelAnswer,
               imageUrl: question.imageUrl || null,
+              options,
+              correctOption,
             });
           }
-        } catch (err) {
+        } catch (err: unknown) {
+          questionsSaved = false;
           console.error("Error saving questions:", err);
+          const msg = err instanceof Error ? err.message : "Could not save questions.";
           toast({
-            title: "Warning",
-            description: "Exam was saved but there was an issue saving the questions.",
+            title: "Exam saved — questions failed",
+            description: msg,
             variant: "destructive",
           });
         }
@@ -474,7 +486,9 @@ export default function ExamEditor({
 
       queryClient.invalidateQueries({ queryKey: ["/api/exams"] });
       queryClient.invalidateQueries({ queryKey: [`/api/exams/${examId}/questions`] });
-      onOpenChange(false);
+      if (questionsSaved) {
+        onOpenChange(false);
+      }
     } catch (error: any) {
       const errorMessage = error?.message || "There was an error saving the exam.";
       toast({
@@ -488,21 +502,6 @@ export default function ExamEditor({
   };
 
   const addQuestion = () => {
-<<<<<<< HEAD
-    const newQuestionId =
-      questions.length > 0 ? Math.max(...questions.map((q) => q.id)) + 1 : 1;
-
-    setQuestions([
-      ...questions,
-      {
-        id: newQuestionId,
-        text: "",
-        order: questions.length,
-        modelAnswer: null,
-        imageUrl: null,
-      },
-    ]);
-=======
     setQuestions((prev) => {
       const newQuestionId =
         prev.length > 0 ? Math.max(...prev.map((q) => q.id)) + 1 : 1;
@@ -553,7 +552,6 @@ export default function ExamEditor({
         return { ...q, options: opts, correctOption };
       })
     );
->>>>>>> 6ad5e77615f716cf66ed0d0cf43601bb0ae769d2
   };
 
   const updateQuestionText = (questionId: number, text: string) => {
@@ -570,6 +568,20 @@ export default function ExamEditor({
 
   const isLoading = (isLoadingExam || isLoadingQuestions) && isEditing;
 
+  const onInvalid = (errors: typeof form.formState.errors) => {
+    const firstKey = Object.keys(errors)[0] as keyof ExamFormValues | undefined;
+    const firstErr = firstKey ? errors[firstKey] : undefined;
+    const msg =
+      firstErr && typeof firstErr === "object" && "message" in firstErr
+        ? String(firstErr.message)
+        : "Please complete all required fields (title, description, course, exam type).";
+    toast({
+      title: "Cannot create exam",
+      description: firstKey ? `${String(firstKey)}: ${msg}` : msg,
+      variant: "destructive",
+    });
+  };
+
   return (
     <CreateFormDialog
       open={open}
@@ -584,6 +596,8 @@ export default function ExamEditor({
       footer={
         <CreateFormFooter
           formId={EXAM_FORM_ID}
+          submitType="button"
+          onSubmit={() => void form.handleSubmit(onSubmit, onInvalid)()}
           onCancel={() => onOpenChange(false)}
           submitLabel={isEditing ? "Update Exam" : "Create Exam"}
           pendingLabel="Saving..."
@@ -600,7 +614,7 @@ export default function ExamEditor({
         <Form {...form}>
           <form
             id={EXAM_FORM_ID}
-            onSubmit={form.handleSubmit(onSubmit)}
+            onSubmit={form.handleSubmit(onSubmit, onInvalid)}
             className="space-y-6"
           >
             <FormSection
@@ -610,8 +624,6 @@ export default function ExamEditor({
               <div className="space-y-4">
                 <FormField
                   control={form.control}
-<<<<<<< HEAD
-=======
                   name="examType"
                   render={({ field }) => (
                     <FormItem>
@@ -664,7 +676,6 @@ export default function ExamEditor({
 
                 <FormField
                   control={form.control}
->>>>>>> 6ad5e77615f716cf66ed0d0cf43601bb0ae769d2
                   name="title"
                   render={({ field }) => (
                     <FormItem>
@@ -897,6 +908,11 @@ export default function ExamEditor({
                             <p className="text-xs text-muted-foreground">
                               Supports PDF (.pdf) and Word (.docx) files with text & images.
                             </p>
+                            {examType === "mcq" && (
+                              <p className="mt-1 text-[11px] text-muted-foreground">
+                                Format: number each question, options as A) B) C) D), then Answer: B
+                              </p>
+                            )}
                             {pdfPool.length > 0 && (
                               <Badge className="mt-2 rounded-full border border-green-200 bg-green-100 text-[10px] font-bold uppercase tracking-wide text-green-800">
                                 {pdfPool.length} questions in pool
@@ -1036,8 +1052,6 @@ export default function ExamEditor({
                       placeholder="e.g. How many triangles are there in the diagram below?"
                     />
 
-<<<<<<< HEAD
-=======
                     {examType === "mcq" && (
                       <div className="mt-4 space-y-2">
                         <FormLabel className={createFormLabelClass}>Answer options</FormLabel>
@@ -1105,7 +1119,6 @@ export default function ExamEditor({
                       </div>
                     )}
 
->>>>>>> 6ad5e77615f716cf66ed0d0cf43601bb0ae769d2
                     {/* Question Image Attachment section */}
                     <div className="mt-3.5 rounded-xl border border-border/80 bg-slate-50/50 p-3.5">
                       <div className="flex items-center justify-between mb-2">
@@ -1192,16 +1205,23 @@ export default function ExamEditor({
                       )}
                     </div>
 
-                    {question.modelAnswer ? (
+                    {examType === "theory" && question.modelAnswer ? (
                       <p className="mt-3 rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
                         <span className="font-semibold text-[#2D3748]">Model answer: </span>
                         {question.modelAnswer}
                       </p>
-                    ) : (
+                    ) : examType === "theory" &&
+                      question.options &&
+                      question.options.filter((o) => o.trim()).length >= 2 ? (
+                      <p className="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        Parsed options will be appended to the question text when you save this
+                        theory exam.
+                      </p>
+                    ) : examType === "theory" ? (
                       <p className="mt-3 text-xs text-muted-foreground">
                         Students will provide written answers.
                       </p>
-                    )}
+                    ) : null}
                   </div>
                 ))}
 

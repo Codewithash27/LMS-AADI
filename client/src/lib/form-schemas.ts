@@ -30,6 +30,7 @@ export const createStudentSchema = z.object({
 export type CreateStudentFormValues = z.infer<typeof createStudentSchema>;
 
 export const examFormSchema = z.object({
+  examType: z.enum(["theory", "mcq"]).default("theory"),
   title: z.string().min(3, "Title must be at least 3 characters"),
   description: z.string().min(1, "Description is required"),
   courseId: z.string().min(1, "Please select a course"),
