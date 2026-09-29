@@ -9,8 +9,9 @@ export function normalizeExamType(value: unknown): ExamType {
   return value === "mcq" ? "mcq" : "theory";
 }
 
+/** Hide grading keys from students; keep options so they can answer MCQs. */
 export function stripQuestionForStudent(q: Question | McqQuestion) {
-  const { modelAnswer, correctOption, options, ...rest } = q as McqQuestion;
+  const { modelAnswer, correctOption, ...rest } = q as McqQuestion;
   return rest;
 }
 

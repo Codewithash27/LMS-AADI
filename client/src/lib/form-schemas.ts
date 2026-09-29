@@ -42,7 +42,10 @@ export const examFormSchema = z.object({
     .max(600, "Duration cannot exceed 600 minutes"),
   acceptingResponses: z.boolean().default(true),
   questionSource: z.enum(["manual", "pdf"]).default("manual"),
-  questionCount: z.coerce.number().int().min(1).optional(),
+  questionCount: z.preprocess(
+    (v) => (v === "" || v === undefined || v === null ? undefined : Number(v)),
+    z.number().int().min(1).optional()
+  ),
 });
 
 export type ExamFormValues = z.infer<typeof examFormSchema>;

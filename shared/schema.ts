@@ -200,6 +200,8 @@ export const exams = pgTable("exams", {
   duration: integer("duration").notNull().default(60),
   /** Optional batch tag for admin targeting; student access is by course enrollment. */
   batchId: integer("batch_id"),
+  /** theory = written answers; mcq = auto-graded multiple choice */
+  examType: text("exam_type").notNull().default("theory"),
 });
 
 export const insertExamSchema = createInsertSchema(exams)
@@ -212,11 +214,13 @@ export const insertExamSchema = createInsertSchema(exams)
     acceptingResponses: true,
     duration: true,
     batchId: true,
+    examType: true,
   })
   .extend({
     acceptingResponses: z.boolean().optional().default(true),
     duration: z.coerce.number().int().min(1).max(600).optional().default(60),
     batchId: z.number().int().positive().nullable().optional(),
+    examType: examTypeSchema.optional().default("theory"),
   });
 
 export type InsertExam = z.infer<typeof insertExamSchema>;
@@ -232,6 +236,9 @@ export const questions = pgTable("questions", {
   modelAnswer: text("model_answer"),
   /** Optional image / diagram URL attached to this question. */
   imageUrl: text("image_url"),
+  /** MCQ choice labels (student sees these; correctOption is admin-only). */
+  options: jsonb("options"),
+  correctOption: integer("correct_option"),
 });
 
 export const insertQuestionSchema = createInsertSchema(questions).pick({
@@ -240,9 +247,13 @@ export const insertQuestionSchema = createInsertSchema(questions).pick({
   order: true,
   modelAnswer: true,
   imageUrl: true,
+  options: true,
+  correctOption: true,
 }).extend({
   modelAnswer: z.string().nullable().optional(),
   imageUrl: z.string().nullable().optional(),
+  options: z.array(z.string()).nullable().optional(),
+  correctOption: z.number().int().min(0).nullable().optional(),
 });
 
 export type InsertQuestion = z.infer<typeof insertQuestionSchema>;
@@ -258,6 +269,8 @@ export const examAttempts = pgTable("exam_attempts", {
   answers: jsonb("answers"), // User's text answers (JSON object with question ID as key and text answer as value)
   feedback: text("feedback"), // Instructor feedback on the answers
   reviewedAt: timestamp("reviewed_at"), // When the instructor reviewed the answers
+  score: integer("score"),
+  maxScore: integer("max_score"),
 });
 
 export const insertExamAttemptSchema = createInsertSchema(examAttempts).pick({

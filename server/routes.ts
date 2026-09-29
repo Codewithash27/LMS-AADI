@@ -21,7 +21,18 @@ import {
   insertLessonProgressSchema
 } from "@shared/schema";
 import { parseQuestionsFromText, parseQuestionsFromDocx, extractImagesFromPdfBuffer } from "./pdf-questions";
+import { countParseStats } from "./mcq-question-parse";
+import {
+  gradeMcqAnswers,
+  normalizeExamType,
+  stripQuestionForStudent,
+  validateMcqQuestionPayload,
+} from "./exam-mcq-utils";
 import { PDFParse } from "pdf-parse";
+
+function isAdminUser(user: { role?: string } | undefined): boolean {
+  return user?.role === "admin" || user?.role === "superadmin";
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static files from uploads directory
@@ -993,17 +1004,19 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
       if (questions.length === 0) {
         return res.status(422).json({
           message:
-            "No questions found. Use numbered items like Q1. / 1. / Question 1: and optional Answer: lines.",
+            "No questions found. Number each question (1. / Q1.), list options as A) B) C) D), then add a line like Answer: B.",
           questions: [],
           pageCount,
         });
       }
 
+      const parseStats = countParseStats(questions);
       res.json({
         questions,
         total: questions.length,
         pageCount,
         fileName: req.file.originalname,
+        parseStats,
       });
     } catch (error: any) {
       console.error("Failed to parse questions document:", error);
@@ -1086,6 +1099,7 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
           req.body.batchId === "none"
             ? null
             : Number(req.body.batchId),
+        examType: normalizeExamType(req.body.examType),
       });
       
       // Check if course belongs to user's tenant
@@ -1145,6 +1159,7 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
         startTime: z.string().transform(str => new Date(str)).optional(),
         endTime: z.string().transform(str => new Date(str)).optional(),
         acceptingResponses: z.boolean().optional(),
+        examType: z.enum(["theory", "mcq"]).optional(),
       });
       
       const validatedData = updateSchema.parse({
@@ -1159,6 +1174,8 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
                 req.body.batchId === "none"
               ? null
               : Number(req.body.batchId),
+        examType:
+          req.body.examType != null ? normalizeExamType(req.body.examType) : undefined,
       });
 
       if (validatedData.batchId) {
@@ -1225,7 +1242,11 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
       }
       
       const questions = await storage.getQuestionsByExam(examId);
-      res.json(questions);
+      if (isAdminUser(req.user)) {
+        res.json(questions);
+      } else {
+        res.json(questions.map((q) => stripQuestionForStudent(q)));
+      }
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch questions" });
     }
@@ -1278,15 +1299,34 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
       // Get existing questions count to calculate order
       const existingQuestions = await storage.getQuestionsByExam(examId);
       const nextOrder = existingQuestions.length;
-      
-      const questionData = {
+
+      const examType = normalizeExamType(exam.examType);
+      const questionNumber =
+        req.body.order !== undefined ? Number(req.body.order) + 1 : nextOrder + 1;
+
+      let questionData: Record<string, unknown> = {
         examId,
         text: req.body.text,
         order: req.body.order !== undefined ? req.body.order : nextOrder,
         modelAnswer: req.body.modelAnswer ?? null,
         imageUrl: req.body.imageUrl ?? null,
+        options: examType === "mcq" ? req.body.options ?? null : null,
+        correctOption: examType === "mcq" ? req.body.correctOption ?? null : null,
       };
-      
+
+      if (examType === "mcq") {
+        const check = validateMcqQuestionPayload(
+          String(questionData.text ?? ""),
+          questionData.options,
+          questionData.correctOption,
+          questionNumber
+        );
+        if ("error" in check) {
+          return res.status(400).json({ message: check.error });
+        }
+        questionData = { ...questionData, options: check.options, correctOption: check.correctOption };
+      }
+
       const validatedData = insertQuestionSchema.parse(questionData);
       const question = await storage.createQuestion(validatedData);
       
@@ -1525,9 +1565,18 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
           }
         }
         
-        // Store the answers but don't calculate a score - will be reviewed by instructor
-        // Set a null score to indicate it needs review
-        req.body.score = null;
+        let questionResults: Record<number, boolean> | undefined;
+        const examType = normalizeExamType(exam.examType);
+        if (examType === "mcq") {
+          const graded = gradeMcqAnswers(questions, req.body.answers);
+          req.body.score = graded.score;
+          req.body.maxScore = graded.maxScore;
+          req.body.feedback = graded.feedback;
+          questionResults = graded.questionResults;
+        } else {
+          req.body.score = null;
+          req.body.maxScore = null;
+        }
         
         // Create activity log
         await storage.createActivityLog({
@@ -1537,6 +1586,12 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
           resourceType: "exam",
           tenantId: req.user!.tenantId
         });
+
+        const updatedAttempt = await storage.updateExamAttempt(attemptId, req.body);
+        if (questionResults) {
+          return res.json({ ...updatedAttempt, questionResults });
+        }
+        return res.json(updatedAttempt);
       }
       
       const updatedAttempt = await storage.updateExamAttempt(attemptId, req.body);
