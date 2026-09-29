@@ -77,8 +77,29 @@ type ParsedPdfQuestion = {
 const DEFAULT_MCQ_OPTIONS = ["", "", "", ""];
 
 function ensureMcqOptions(q: QuestionType): QuestionType {
-  if (q.options && q.options.length >= 2) return q;
-  return { ...q, options: [...DEFAULT_MCQ_OPTIONS], correctOption: q.correctOption ?? null };
+  const opts = [...(q.options?.length ? q.options : DEFAULT_MCQ_OPTIONS)];
+  while (opts.length < 4) opts.push("");
+  return { ...q, options: opts.slice(0, 6), correctOption: q.correctOption ?? null };
+}
+
+function buildQuestionsFromPool(
+  pool: ParsedPdfQuestion[],
+  count: number,
+  isMcq: boolean
+): QuestionType[] {
+  const picked = shufflePick(pool, count);
+  return picked.map((q, index) => {
+    const base: QuestionType = {
+      id: index + 1,
+      text: q.text,
+      order: index,
+      modelAnswer: q.modelAnswer ?? null,
+      imageUrl: q.imageUrl ?? null,
+      options: q.options?.slice(0, 6),
+      correctOption: q.correctOption ?? null,
+    };
+    return isMcq ? ensureMcqOptions(base) : base;
+  });
 }
 
 type ExamEditorProps = {
@@ -216,27 +237,14 @@ export default function ExamEditor({
     } else if (!exam?.id) {
       setQuestions([]);
     }
-  }, [examQuestions, exam?.id]);
+  }, [examQuestions, exam?.id, fetchedExam?.examType]);
 
   // Note: Batch validation is now done on the backend
   // Users can select any batch, and the server will validate if the course is assigned to that batch
 
   const applyRandomFromPoolWith = (pool: ParsedPdfQuestion[], count: number) => {
-    const picked = shufflePick(pool, count);
-    setQuestions(
-      picked.map((q, index) => ({
-        id: index + 1,
-        text: q.text,
-        order: index,
-        modelAnswer: q.modelAnswer ?? null,
-        imageUrl: q.imageUrl ?? null,
-        options: q.options?.slice(0, 6),
-        correctOption: q.correctOption ?? null,
-      }))
-    );
-    if (form.getValues("examType") === "mcq") {
-      setQuestions((prev) => prev.map((q) => ensureMcqOptions(q)));
-    }
+    const isMcq = form.getValues("examType") === "mcq";
+    setQuestions(buildQuestionsFromPool(pool, count, isMcq));
   };
 
   const applyRandomFromPool = (count?: number) => {
@@ -356,11 +364,14 @@ export default function ExamEditor({
   };
 
   const onSubmit = async (data: ExamFormValues) => {
+    let questionsToSave = questions;
     if (data.questionSource === "pdf" && pdfPool.length > 0 && questions.length === 0) {
-      applyRandomFromPool(data.questionCount);
+      const n = data.questionCount ?? pdfPool.length;
+      questionsToSave = buildQuestionsFromPool(pdfPool, n, data.examType === "mcq");
+      setQuestions(questionsToSave);
     }
 
-    const emptyQuestions = questions.filter((q) => !q.text.trim() && !q.imageUrl);
+    const emptyQuestions = questionsToSave.filter((q) => !q.text.trim() && !q.imageUrl);
     if (emptyQuestions.length > 0) {
       toast({
         title: "Incomplete questions",
@@ -370,7 +381,7 @@ export default function ExamEditor({
       return;
     }
 
-    if (questions.length === 0) {
+    if (questionsToSave.length === 0) {
       toast({
         title: "No questions",
         description: "Add questions manually or upload a PDF / Word document question bank.",
@@ -380,11 +391,11 @@ export default function ExamEditor({
     }
 
     if (data.examType === "mcq") {
-      for (let i = 0; i < questions.length; i++) {
+      for (let i = 0; i < questionsToSave.length; i++) {
         const err = validateMcqQuestionClient(
-          questions[i].text,
-          questions[i].options ?? [],
-          questions[i].correctOption,
+          questionsToSave[i].text,
+          questionsToSave[i].options ?? [],
+          questionsToSave[i].correctOption,
           i + 1
         );
         if (err) {
@@ -425,12 +436,13 @@ export default function ExamEditor({
         });
       }
 
+      let questionsSaved = true;
       if (examId) {
         try {
           await apiRequest("DELETE", `/api/exams/${examId}/questions`);
 
-          for (let index = 0; index < questions.length; index++) {
-            const question = questions[index];
+          for (let index = 0; index < questionsToSave.length; index++) {
+            const question = questionsToSave[index];
             let text = question.text;
             let options: string[] | null = null;
             let correctOption: number | null = null;
@@ -461,6 +473,7 @@ export default function ExamEditor({
             });
           }
         } catch (err: unknown) {
+          questionsSaved = false;
           console.error("Error saving questions:", err);
           const msg = err instanceof Error ? err.message : "Could not save questions.";
           toast({
@@ -473,7 +486,9 @@ export default function ExamEditor({
 
       queryClient.invalidateQueries({ queryKey: ["/api/exams"] });
       queryClient.invalidateQueries({ queryKey: [`/api/exams/${examId}/questions`] });
-      onOpenChange(false);
+      if (questionsSaved) {
+        onOpenChange(false);
+      }
     } catch (error: any) {
       const errorMessage = error?.message || "There was an error saving the exam.";
       toast({
@@ -487,17 +502,18 @@ export default function ExamEditor({
   };
 
   const addQuestion = () => {
-    const newQuestionId =
-      questions.length > 0 ? Math.max(...questions.map((q) => q.id)) + 1 : 1;
-
-    const base: QuestionType = {
-      id: newQuestionId,
-      text: "",
-      order: questions.length,
-      modelAnswer: null,
-      imageUrl: null,
-    };
-    setQuestions([...questions, examType === "mcq" ? ensureMcqOptions(base) : base]);
+    setQuestions((prev) => {
+      const newQuestionId =
+        prev.length > 0 ? Math.max(...prev.map((q) => q.id)) + 1 : 1;
+      const base: QuestionType = {
+        id: newQuestionId,
+        text: "",
+        order: prev.length,
+        modelAnswer: null,
+        imageUrl: null,
+      };
+      return [...prev, examType === "mcq" ? ensureMcqOptions(base) : base];
+    });
   };
 
   const updateQuestionOptions = (questionId: number, options: string[]) => {
@@ -539,15 +555,15 @@ export default function ExamEditor({
   };
 
   const updateQuestionText = (questionId: number, text: string) => {
-    setQuestions(
-      questions.map((question) =>
+    setQuestions((prev) =>
+      prev.map((question) =>
         question.id === questionId ? { ...question, text } : question
       )
     );
   };
 
   const removeQuestion = (questionId: number) => {
-    setQuestions(questions.filter((question) => question.id !== questionId));
+    setQuestions((prev) => prev.filter((question) => question.id !== questionId));
   };
 
   const isLoading = (isLoadingExam || isLoadingQuestions) && isEditing;
@@ -635,7 +651,10 @@ export default function ExamEditor({
                         <button
                           type="button"
                           disabled={isSaving}
-                          onClick={() => field.onChange("mcq")}
+                          onClick={() => {
+                            field.onChange("mcq");
+                            setQuestions((prev) => prev.map((q) => ensureMcqOptions(q)));
+                          }}
                           className={
                             "rounded-xl border p-4 text-left transition-colors " +
                             (field.value === "mcq"
@@ -1036,6 +1055,9 @@ export default function ExamEditor({
                     {examType === "mcq" && (
                       <div className="mt-4 space-y-2">
                         <FormLabel className={createFormLabelClass}>Answer options</FormLabel>
+                        <p className="text-xs text-muted-foreground">
+                          Fill at least two options, then click a letter to mark the correct answer.
+                        </p>
                         {(question.options ?? DEFAULT_MCQ_OPTIONS).map((opt, optIdx) => (
                           <div key={optIdx} className="flex items-center gap-2">
                             <button
