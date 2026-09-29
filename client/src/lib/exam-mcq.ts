@@ -42,6 +42,19 @@ export function normalizeMcqOptions(
   return { options: trimmed, correctOption: newCorrect };
 }
 
+/** If PDF gave a model answer matching an option but no correct index, infer it. */
+export function inferMcqCorrectOption(
+  options: string[],
+  correctOption: number | null | undefined,
+  modelAnswer: string | null | undefined
+): number | null {
+  if (correctOption != null && correctOption >= 0) return correctOption;
+  const key = modelAnswer?.trim();
+  if (!key) return null;
+  const idx = options.findIndex((o) => o.trim().toLowerCase() === key.toLowerCase());
+  return idx >= 0 ? idx : null;
+}
+
 export function validateMcqQuestionClient(
   text: string,
   options: string[],

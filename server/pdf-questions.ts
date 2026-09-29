@@ -1,11 +1,14 @@
 import path from "path";
 import fs from "fs";
 import mammoth from "mammoth";
+import { htmlToStructuredText, parseMcqBlock } from "./mcq-question-parse";
 
 export type ParsedQuestion = {
   text: string;
   modelAnswer?: string | null;
   imageUrl?: string | null;
+  options?: string[];
+  correctOption?: number;
 };
 
 /**
@@ -76,6 +79,18 @@ function splitQuestionAndAnswer(block: string): ParsedQuestion {
     cleanedBlock = block.replace(imgMatch[0], "").trim();
   }
 
+  const mcq = parseMcqBlock(cleanedBlock);
+  if (mcq.options.length >= 2) {
+    const text = (mcq.questionText || cleanedBlock).replace(/\s+/g, " ").trim();
+    return {
+      text,
+      options: mcq.options,
+      correctOption: mcq.correctOption,
+      modelAnswer: mcq.modelAnswer ?? null,
+      imageUrl,
+    };
+  }
+
   const answerMatch = cleanedBlock.match(
     /\n\s*(?:model\s*)?(?:answer|ans|solution)\s*[:\-]\s*([\s\S]+)$/i
   );
@@ -124,16 +139,7 @@ export async function parseQuestionsFromDocx(buffer: Buffer): Promise<ParsedQues
   );
 
   const html = result.value || "";
-  // Convert HTML <img> tags into [IMG:url] tokens for text parser
-  const processedText = html
-    .replace(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi, "\n[IMG:$1]\n")
-    .replace(/<p[^>]*>/gi, "\n")
-    .replace(/<\/p>/gi, "\n")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<h[1-6][^>]*>/gi, "\n")
-    .replace(/<\/h[1-6]>/gi, "\n")
-    .replace(/<[^>]+>/g, " ");
-
+  const processedText = htmlToStructuredText(html);
   return parseQuestionsFromText(processedText);
 }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+﻿import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,6 +30,7 @@ import {
   normalizeExamType,
   validateMcqQuestionClient,
   normalizeMcqOptions,
+  inferMcqCorrectOption,
 } from "@/lib/exam-mcq";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -227,16 +228,13 @@ export default function ExamEditor({
   }, [fetchedExam, exam?.id, open, form]);
 
   useEffect(() => {
-    if (examQuestions && exam?.id) {
-      const type = normalizeExamType(fetchedExam?.examType);
-      setQuestions(
-        (examQuestions as QuestionType[]).map((q) =>
-          type === "mcq" ? ensureMcqOptions(q) : q
-        )
-      );
-    } else if (!exam?.id) {
-      setQuestions([]);
-    }
+    if (!exam?.id || !examQuestions) return;
+    const type = normalizeExamType(fetchedExam?.examType);
+    setQuestions(
+      (examQuestions as QuestionType[]).map((q) =>
+        type === "mcq" ? ensureMcqOptions(q) : q
+      )
+    );
   }, [examQuestions, exam?.id, fetchedExam?.examType]);
 
   // Note: Batch validation is now done on the backend
@@ -365,7 +363,7 @@ export default function ExamEditor({
 
   const onSubmit = async (data: ExamFormValues) => {
     let questionsToSave = questions;
-    if (data.questionSource === "pdf" && pdfPool.length > 0 && questions.length === 0) {
+    if (data.questionSource === "pdf" && pdfPool.length > 0) {
       const n = data.questionCount ?? pdfPool.length;
       questionsToSave = buildQuestionsFromPool(pdfPool, n, data.examType === "mcq");
       setQuestions(questionsToSave);
@@ -391,6 +389,15 @@ export default function ExamEditor({
     }
 
     if (data.examType === "mcq") {
+      questionsToSave = questionsToSave.map((q) => ({
+        ...q,
+        correctOption: inferMcqCorrectOption(
+          q.options ?? [],
+          q.correctOption,
+          q.modelAnswer
+        ),
+      }));
+
       for (let i = 0; i < questionsToSave.length; i++) {
         const err = validateMcqQuestionClient(
           questionsToSave[i].text,
@@ -653,7 +660,21 @@ export default function ExamEditor({
                           disabled={isSaving}
                           onClick={() => {
                             field.onChange("mcq");
-                            setQuestions((prev) => prev.map((q) => ensureMcqOptions(q)));
+                            setQuestions((prev) => {
+                              const next = prev.map((q) => ensureMcqOptions(q));
+                              if (next.length === 0) {
+                                return [
+                                  ensureMcqOptions({
+                                    id: 1,
+                                    text: "",
+                                    order: 0,
+                                    modelAnswer: null,
+                                    imageUrl: null,
+                                  }),
+                                ];
+                              }
+                              return next;
+                            });
                           }}
                           className={
                             "rounded-xl border p-4 text-left transition-colors " +
@@ -802,13 +823,10 @@ export default function ExamEditor({
                               className={createFormControlClass + " pl-9"}
                               disabled={isSaving}
                               value={field.value ?? 60}
-                              onChange={(e) =>
-                                field.onChange(
-                                  e.target.value === ""
-                                    ? ""
-                                    : Number(e.target.value)
-                                )
-                              }
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                field.onChange(raw === "" ? 60 : Number(raw));
+                              }}
                             />
                           </div>
                         </FormControl>

@@ -63,10 +63,24 @@ app.use((req, res, next) => {
   // Allow deployment platforms and reverse proxies to override the port.
   // Keep 5000 as the default so local development and the existing setup still work.
   const port = Number(process.env.PORT) || 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0"
-  }, () => {
-    log(`serving on port ${port}`);
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(
+        `\nPort ${port} is already in use. Stop the other process or run:\n` +
+          `  npx kill-port ${port}\n` +
+          `Then run npm run dev again.\n`
+      );
+      process.exit(1);
+    }
+    throw err;
   });
+  server.listen(
+    {
+      port,
+      host: "0.0.0.0",
+    },
+    () => {
+      log(`serving on port ${port}`);
+    }
+  );
 })();
