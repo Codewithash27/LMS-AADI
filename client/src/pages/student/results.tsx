@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { getQuestionImageUrl, getCleanQuestionText } from "@/components/exams/exam-view";
+import { normalizeExamType, parseMcqScoreFromFeedback } from "@/lib/exam-mcq";
 import {
   Dialog,
   DialogContent,
@@ -166,6 +167,27 @@ export default function StudentResults() {
 
   const formatDate = (dateString: string) =>
     format(new Date(dateString), "MMM d, yyyy h:mm a");
+
+  const getAttemptAnswers = (attempt: any): Record<string, string> => {
+    let raw = attempt?.answers;
+    if (typeof raw === "string") {
+      try {
+        raw = JSON.parse(raw);
+      } catch {
+        return {};
+      }
+    }
+    if (!raw || typeof raw !== "object") return {};
+    return raw as Record<string, string>;
+  };
+
+  const examMcqPercent = (exam: any, attempt: any): number | null => {
+    if (normalizeExamType(exam?.examType) !== "mcq" || !attempt?.completedAt) return null;
+    if (attempt.score != null && attempt.maxScore > 0) {
+      return Math.round((Number(attempt.score) / Number(attempt.maxScore)) * 100);
+    }
+    return parseMcqScoreFromFeedback(attempt.feedback)?.percent ?? null;
+  };
 
   const filteredMcqGroups = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -495,7 +517,11 @@ export default function StudentResults() {
                   if (!exam) return null;
                   const course = getCourseById(exam.courseId);
                   const isCompleted = !!attempt.completedAt;
-                  const isGraded = !!attempt.reviewedAt && !!attempt.feedback;
+                  const isMcqExam = normalizeExamType(exam.examType) === "mcq";
+                  const mcqPercent = examMcqPercent(exam, attempt);
+                  const isAutoGradedMcq = isMcqExam && isCompleted && mcqPercent != null;
+                  const isGraded =
+                    isAutoGradedMcq || (!!attempt.reviewedAt && !!attempt.feedback);
 
                   return (
                     <Card
@@ -510,7 +536,11 @@ export default function StudentResults() {
                               {course?.title || "Unknown Course"}
                             </p>
                           </div>
-                          {isGraded ? (
+                          {isAutoGradedMcq ? (
+                            <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 shrink-0">
+                              MCQ · {mcqPercent}%
+                            </Badge>
+                          ) : isGraded ? (
                             <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 shrink-0">
                               Graded
                             </Badge>
@@ -539,6 +569,12 @@ export default function StudentResults() {
                               ? `Submitted: ${formatDate(attempt.completedAt)}`
                               : `Started: ${formatDate(attempt.startedAt)}`}
                           </div>
+                          {isAutoGradedMcq && attempt.score != null && attempt.maxScore != null ? (
+                            <div className="flex items-center gap-1.5 font-medium text-emerald-800">
+                              <Award className="h-4 w-4" />
+                              {attempt.score} / {attempt.maxScore} correct ({mcqPercent}%)
+                            </div>
+                          ) : null}
                         </div>
                         <Button
                           variant="outline"
@@ -767,26 +803,46 @@ export default function StudentResults() {
                 </DialogHeader>
 
                 <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      {selectedAttempt.reviewedAt && selectedAttempt.feedback ? (
-                        <Badge className="bg-emerald-100 text-emerald-800">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Graded
-                        </Badge>
-                      ) : selectedAttempt.completedAt ? (
-                        <Badge className="bg-amber-100 text-amber-800">
-                          <AlertCircle className="h-3 w-3 mr-1" />
-                          Pending Review
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-sky-100 text-sky-800">
-                          <Clock className="h-3 w-3 mr-1" />
-                          In Progress
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
+                  {(() => {
+                    const detailExam = getExamById(selectedAttempt.examId);
+                    const pct = detailExam
+                      ? examMcqPercent(detailExam, selectedAttempt)
+                      : null;
+                    const autoMcq = pct != null;
+                    return (
+                      <div className="flex flex-wrap items-center gap-2">
+                        {autoMcq ? (
+                          <>
+                            <Badge className="bg-emerald-100 text-emerald-800">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Auto-graded MCQ · {pct}%
+                            </Badge>
+                            {selectedAttempt.score != null &&
+                            selectedAttempt.maxScore != null ? (
+                              <span className="text-sm font-semibold text-gray-800">
+                                {selectedAttempt.score} / {selectedAttempt.maxScore} correct
+                              </span>
+                            ) : null}
+                          </>
+                        ) : selectedAttempt.reviewedAt && selectedAttempt.feedback ? (
+                          <Badge className="bg-emerald-100 text-emerald-800">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Graded
+                          </Badge>
+                        ) : selectedAttempt.completedAt ? (
+                          <Badge className="bg-amber-100 text-amber-800">
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            Pending Review
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-sky-100 text-sky-800">
+                            <Clock className="h-3 w-3 mr-1" />
+                            In Progress
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   <div>
                     <h3 className="text-base font-medium mb-3">Your Answers</h3>
@@ -807,7 +863,9 @@ export default function StudentResults() {
                           <div className="bg-sky-50 rounded p-2.5">
                             <Label className="text-xs font-medium text-sky-700">Your Answer:</Label>
                             <p className="mt-1 text-sm text-gray-900">
-                              {selectedAttempt?.answers?.[question.id] || "No answer provided"}
+                              {getAttemptAnswers(selectedAttempt)[String(question.id)] ||
+                                getAttemptAnswers(selectedAttempt)[question.id as unknown as string] ||
+                                "No answer provided"}
                             </p>
                           </div>
                         </div>
@@ -817,7 +875,12 @@ export default function StudentResults() {
 
                   {selectedAttempt.feedback && (
                     <div>
-                      <h3 className="text-base font-medium mb-2">Instructor Feedback</h3>
+                      <h3 className="text-base font-medium mb-2">
+                        {normalizeExamType(getExamById(selectedAttempt.examId)?.examType) ===
+                        "mcq"
+                          ? "Auto-grade summary"
+                          : "Instructor Feedback"}
+                      </h3>
                       <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
                         <p className="text-gray-900 whitespace-pre-wrap text-sm">
                           {selectedAttempt.feedback}
@@ -826,7 +889,10 @@ export default function StudentResults() {
                     </div>
                   )}
 
-                  {selectedAttempt.completedAt && !selectedAttempt.feedback && (
+                  {selectedAttempt.completedAt &&
+                    !selectedAttempt.feedback &&
+                    normalizeExamType(getExamById(selectedAttempt.examId)?.examType) !==
+                      "mcq" && (
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-2">
                       <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                       <p className="text-amber-800 text-sm">

@@ -20,6 +20,24 @@ import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { normalizeExamType, parseMcqScoreFromFeedback } from "@/lib/exam-mcq";
+
+function getCompletedAttempt(examAttempts: any[], examId: number) {
+  return (examAttempts as any[]).find(
+    (a) => Number(a.examId) === Number(examId) && a.completedAt
+  );
+}
+
+function mcqAttemptScoreLabel(exam: any, attempt: any | undefined): string | null {
+  if (!attempt || normalizeExamType(exam?.examType) !== "mcq") return null;
+  if (attempt.score != null && attempt.maxScore > 0) {
+    const pct = Math.round((Number(attempt.score) / Number(attempt.maxScore)) * 100);
+    return `Score: ${attempt.score}/${attempt.maxScore} (${pct}%)`;
+  }
+  const parsed = parseMcqScoreFromFeedback(attempt.feedback);
+  if (parsed) return `Score: ${parsed.score}/${parsed.maxScore} (${parsed.percent}%)`;
+  return null;
+}
 
 function hasCompletedAttempt(examAttempts: any[], examId: number) {
   return examAttempts.some(
@@ -223,6 +241,12 @@ export default function StudentUpcomingExams() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filteredExams.map((exam: any) => {
             const state = getExamState(exam);
+            const completedAttempt = getCompletedAttempt(
+              examAttempts as any[],
+              exam.id
+            );
+            const scoreLabel = mcqAttemptScoreLabel(exam, completedAttempt);
+            const isMcq = normalizeExamType(exam.examType) === "mcq";
             return (
               <Card
                 key={exam.id}
@@ -256,6 +280,18 @@ export default function StudentUpcomingExams() {
                   <p className="line-clamp-2 text-[15px] text-muted-foreground">
                     {exam.description || "No description"}
                   </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {isMcq ? (
+                      <Badge className="rounded-full border border-primary/30 bg-primary/10 text-[10px] font-bold uppercase text-primary">
+                        MCQ · auto-graded
+                      </Badge>
+                    ) : null}
+                    {scoreLabel ? (
+                      <Badge className="rounded-full border border-emerald-200 bg-emerald-50 text-[11px] font-semibold text-emerald-800">
+                        {scoreLabel}
+                      </Badge>
+                    ) : null}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     Opens in a new tab · one attempt only
                   </p>

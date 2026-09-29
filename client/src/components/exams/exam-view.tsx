@@ -2,7 +2,12 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { BookOpen, Clock, LogOut, AlertTriangle } from "lucide-react";
+import { BookOpen, Clock, LogOut, AlertTriangle, Check, Award } from "lucide-react";
+import {
+  normalizeExamType,
+  mcqEncouragement,
+  OPTION_LETTERS,
+} from "@/lib/exam-mcq";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
@@ -22,6 +27,14 @@ type ExamQuestion = {
   text: string;
   order: number;
   imageUrl?: string | null;
+  options?: string[] | null;
+};
+
+type SubmitScoreSummary = {
+  score: number;
+  maxScore: number;
+  percent: number;
+  feedback: string;
 };
 
 type ExamViewProps = {
@@ -33,6 +46,7 @@ type ExamViewProps = {
     description: string;
     duration?: number;
     acceptingResponses?: boolean;
+    examType?: string;
   };
   /** dialog kept for compatibility; page = MCQ-style secure shell */
   mode?: "dialog" | "page";
@@ -98,6 +112,11 @@ function parseStoredAnswers(
   return initial;
 }
 
+function normalizeQuestionOptions(q: { options?: unknown }): string[] {
+  if (!Array.isArray(q.options)) return [];
+  return q.options.map((o) => String(o ?? "").trim()).filter(Boolean);
+}
+
 export default function ExamView({
   open = true,
   onOpenChange,
@@ -120,7 +139,10 @@ export default function ExamView({
   const [isExitDialogOpen, setIsExitDialogOpen] = useState(false);
   const [violations, setViolations] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [submitScore, setSubmitScore] = useState<SubmitScoreSummary | null>(null);
   const { toast } = useToast();
+
+  const isMcqExam = normalizeExamType(exam?.examType) === "mcq";
 
   const answersRef = useRef(answers);
   const examAttemptIdRef = useRef(examAttemptId);
@@ -194,9 +216,12 @@ export default function ExamView({
         const questionsData = await questionsResponse.json();
         if (cancelled) return;
 
-        const sorted = [...questionsData].sort(
-          (a: any, b: any) => a.order - b.order
-        );
+        const sorted = [...questionsData]
+          .sort((a: any, b: any) => a.order - b.order)
+          .map((q: any) => ({
+            ...q,
+            options: normalizeQuestionOptions(q),
+          }));
         setQuestions(sorted);
         setAnswers(parseStoredAnswers(attemptData.answers, sorted));
 
@@ -240,12 +265,41 @@ export default function ExamView({
       setIsSubmitting(true);
       isSubmittingRef.current = true;
       try {
-        await apiRequest("PUT", `/api/exam-attempts/${attemptId}`, {
+        const res = await apiRequest("PUT", `/api/exam-attempts/${attemptId}`, {
           completedAt: new Date().toISOString(),
           answers: JSON.stringify(answersRef.current),
         });
+        const data = await res.json();
         setSubmitted(true);
         submittedRef.current = true;
+        queryClient.invalidateQueries({ queryKey: ["/api/exam-attempts/user"] });
+
+        const mcq =
+          isMcqExam &&
+          data.maxScore != null &&
+          data.maxScore > 0 &&
+          data.score != null;
+        if (mcq) {
+          const percent = Math.round((Number(data.score) / Number(data.maxScore)) * 100);
+          setSubmitScore({
+            score: Number(data.score),
+            maxScore: Number(data.maxScore),
+            percent,
+            feedback: String(data.feedback || ""),
+          });
+          toast({
+            title:
+              reason === "tab-switch"
+                ? "Exam auto-submitted"
+                : reason === "timeout"
+                  ? "Time up — exam submitted"
+                  : "MCQ exam submitted",
+            description: `Your score: ${data.score} / ${data.maxScore} (${percent}%).`,
+            variant: reason === "tab-switch" ? "destructive" : "default",
+          });
+          return;
+        }
+
         toast({
           title:
             reason === "tab-switch"
@@ -259,7 +313,6 @@ export default function ExamView({
               : "Your exam has been submitted. You cannot retake it.",
           variant: reason === "tab-switch" ? "destructive" : "default",
         });
-        queryClient.invalidateQueries({ queryKey: ["/api/exam-attempts/user"] });
         closeExam();
       } catch {
         toast({
@@ -273,7 +326,7 @@ export default function ExamView({
         setIsSubmitDialogOpen(false);
       }
     },
-    [exam, toast, closeExam]
+    [exam, toast, closeExam, isMcqExam]
   );
 
   // Same anti-cheat as MCQ take-quiz: block copy/paste; 1st leave = warn, 2nd = auto-submit
@@ -443,6 +496,38 @@ export default function ExamView({
     );
   }
 
+  if (submitted && submitScore) {
+    return (
+      <div className="flex h-[100dvh] select-none flex-col items-center justify-center bg-[#1a3a4a] p-6">
+        <div className="w-full max-w-md rounded-2xl border border-white/20 bg-white p-8 text-center shadow-xl">
+          <Award className="mx-auto mb-3 h-12 w-12 text-amber-500" />
+          <h2 className="text-xl font-bold text-gray-900">Exam submitted</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{exam?.title}</p>
+          <p className="mt-6 text-4xl font-bold tabular-nums text-primary">
+            {submitScore.percent}%
+          </p>
+          <p className="mt-2 text-sm text-gray-700">
+            {submitScore.score} / {submitScore.maxScore} correct
+          </p>
+          <p className="mt-3 text-sm font-medium text-emerald-700">
+            {mcqEncouragement(submitScore.percent)}
+          </p>
+          {submitScore.feedback ? (
+            <p className="mt-4 rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+              {submitScore.feedback}
+            </p>
+          ) : null}
+          <Button
+            className="mt-8 w-full rounded-xl bg-accent-brand text-white hover:opacity-90"
+            onClick={closeExam}
+          >
+            Back to exams
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   const arena = (
     <div className="grid h-full w-full grid-cols-1 overflow-hidden rounded-2xl border border-white/40 shadow-xl md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr]">
       {/* Left: MCQ-style gradient panel + circular timer */}
@@ -452,7 +537,7 @@ export default function ExamView({
 
         <div className="relative z-10">
           <p className="truncate text-[11px] font-medium text-white/80">
-            {exam?.title || "Written Exam"}
+            {exam?.title || (isMcqExam ? "MCQ Exam" : "Written Exam")}
           </p>
           <p className="mt-0.5 text-lg font-bold tracking-tight">
             Question {currentQuestionIndex + 1}
@@ -565,7 +650,7 @@ export default function ExamView({
         <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-white/80 px-3 py-1 text-[11px] font-medium text-muted-foreground shadow-sm">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-turquoise" />
-            Type your answer
+            {isMcqExam ? "Pick one answer" : "Type your answer"}
           </div>
 
           <h2 className="max-w-3xl text-lg font-bold leading-snug text-gray-900 sm:text-xl lg:text-2xl">
@@ -583,23 +668,82 @@ export default function ExamView({
           )}
 
           <div className="mt-5 max-w-3xl sm:mt-6">
-            <Textarea
-              value={answers[currentQuestion?.id] || ""}
-              onChange={(e) => {
-                if (!currentQuestion) return;
-                if (exam?.acceptingResponses === false) return;
-                setAnswers((prev) => ({
-                  ...prev,
-                  [currentQuestion.id]: e.target.value,
-                }));
-              }}
-              placeholder="Type your answer here..."
-              className="min-h-[220px] w-full rounded-2xl border-0 bg-white/90 p-4 text-base shadow-sm focus-visible:ring-2 focus-visible:ring-primary/40"
-              disabled={exam?.acceptingResponses === false}
-            />
-            {(answers[currentQuestion?.id] || "").trim() !== "" && (
+            {isMcqExam ? (
+              (currentQuestion?.options?.length ?? 0) >= 2 ? (
+                <div className="flex flex-col gap-2.5">
+                  {(currentQuestion?.options ?? []).map((opt, optIdx) => {
+                    const selected =
+                      (answers[currentQuestion?.id] || "").trim() === opt.trim();
+                    return (
+                      <button
+                        key={optIdx}
+                        type="button"
+                        disabled={exam?.acceptingResponses === false}
+                        onClick={() => {
+                          if (!currentQuestion) return;
+                          setAnswers((prev) => ({
+                            ...prev,
+                            [currentQuestion.id]: opt,
+                          }));
+                        }}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-2xl border-2 px-3.5 py-3 text-left transition-all",
+                          selected
+                            ? "border-primary bg-white shadow-lg ring-2 ring-primary/30"
+                            : "border-transparent bg-white/90 hover:bg-white hover:shadow-md"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold",
+                            selected
+                              ? "bg-accent-brand text-white"
+                              : "bg-muted text-gray-600"
+                          )}
+                        >
+                          {OPTION_LETTERS[optIdx] ?? "?"}
+                        </span>
+                        <span className="text-sm font-medium leading-snug text-gray-800 sm:text-base">
+                          {opt}
+                        </span>
+                        {selected && (
+                          <Check className="ml-auto h-5 w-5 shrink-0 text-primary" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  This question has no answer choices. Ask your instructor to fix the exam.
+                </p>
+              )
+            ) : (
+              <>
+                <Textarea
+                  value={answers[currentQuestion?.id] || ""}
+                  onChange={(e) => {
+                    if (!currentQuestion) return;
+                    if (exam?.acceptingResponses === false) return;
+                    setAnswers((prev) => ({
+                      ...prev,
+                      [currentQuestion.id]: e.target.value,
+                    }));
+                  }}
+                  placeholder="Type your answer here..."
+                  className="min-h-[220px] w-full rounded-2xl border-0 bg-white/90 p-4 text-base shadow-sm focus-visible:ring-2 focus-visible:ring-primary/40"
+                  disabled={exam?.acceptingResponses === false}
+                />
+                {(answers[currentQuestion?.id] || "").trim() !== "" && (
+                  <Badge className="mt-2 rounded-full border-green-200 bg-green-50 text-green-800">
+                    Answer saved for this question
+                  </Badge>
+                )}
+              </>
+            )}
+            {isMcqExam && (answers[currentQuestion?.id] || "").trim() !== "" && (
               <Badge className="mt-2 rounded-full border-green-200 bg-green-50 text-green-800">
-                Answer saved for this question
+                Answer selected
               </Badge>
             )}
           </div>
