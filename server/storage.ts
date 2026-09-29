@@ -675,6 +675,9 @@ export class DatabaseStorage implements IStorage {
       answers: examAttempts.answers,
       feedback: examAttempts.feedback,
       reviewedAt: examAttempts.reviewedAt,
+      score: examAttempts.score,
+      maxScore: examAttempts.maxScore,
+      examType: exams.examType,
       userFirstName: users.firstName,
       userLastName: users.lastName,
       username: users.username,
@@ -699,6 +702,8 @@ export class DatabaseStorage implements IStorage {
       answers: attempt.answers,
       feedback: attempt.feedback,
       reviewedAt: attempt.reviewedAt,
+      score: attempt.score,
+      maxScore: attempt.maxScore,
       user: {
         id: attempt.userId,
         username: attempt.username,
@@ -708,7 +713,8 @@ export class DatabaseStorage implements IStorage {
       exam: {
         id: attempt.examId,
         title: attempt.examTitle,
-        description: attempt.examDescription
+        description: attempt.examDescription,
+        examType: attempt.examType
       }
     }));
   }
@@ -749,6 +755,8 @@ export class DatabaseStorage implements IStorage {
       answers: examAttempts.answers,
       feedback: examAttempts.feedback,
       reviewedAt: examAttempts.reviewedAt,
+      score: examAttempts.score,
+      maxScore: examAttempts.maxScore,
       examTitle: exams.title,
       examDescription: exams.description
     })
@@ -766,6 +774,8 @@ export class DatabaseStorage implements IStorage {
       answers: result.answers,
       feedback: result.feedback,
       reviewedAt: result.reviewedAt,
+      score: result.score,
+      maxScore: result.maxScore,
       exam: {
         id: result.examId,
         title: result.examTitle,

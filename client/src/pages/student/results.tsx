@@ -41,6 +41,7 @@ import {
   type QuizScoreGroup,
   type QuizScoreRecord,
 } from "@/lib/quiz-attempts";
+import { normalizeExamType, parseMcqScoreFromFeedback } from "@/lib/exam-mcq";
 import {
   PieChart,
   Pie,
@@ -325,7 +326,7 @@ export default function StudentResults() {
               <Target className="h-3.5 w-3.5" />
               MCQ Scores
             </TabsTrigger>
-            <TabsTrigger value="exams">Written Exams</TabsTrigger>
+            <TabsTrigger value="exams">Exams</TabsTrigger>
             <TabsTrigger value="progress">Course Progress</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
@@ -482,9 +483,9 @@ export default function StudentResults() {
               <Card className="border-border bg-white/80">
                 <CardContent className="py-14 text-center">
                   <Award className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-1">No written exams yet</h3>
+                  <h3 className="text-lg font-semibold mb-1">No exams yet</h3>
                   <p className="text-sm text-muted-foreground">
-                    Submitted written exams will appear here after review.
+                    MCQ scores appear right away; written exams show here after instructor review.
                   </p>
                 </CardContent>
               </Card>
@@ -495,7 +496,20 @@ export default function StudentResults() {
                   if (!exam) return null;
                   const course = getCourseById(exam.courseId);
                   const isCompleted = !!attempt.completedAt;
-                  const isGraded = !!attempt.reviewedAt && !!attempt.feedback;
+                  const mcqScore =
+                    typeof attempt.maxScore === "number" && attempt.maxScore > 0
+                      ? {
+                          score: attempt.score ?? 0,
+                          maxScore: attempt.maxScore,
+                          percent: Math.round(
+                            ((attempt.score ?? 0) / attempt.maxScore) * 100
+                          ),
+                        }
+                      : parseMcqScoreFromFeedback(attempt.feedback);
+                  const isMcqExam = normalizeExamType(exam.examType) === "mcq";
+                  const isGraded =
+                    (mcqScore && isCompleted) ||
+                    (!!attempt.reviewedAt && !!attempt.feedback);
 
                   return (
                     <Card
@@ -504,11 +518,21 @@ export default function StudentResults() {
                     >
                       <CardHeader className="pb-2">
                         <div className="flex justify-between gap-3 items-start">
-                          <div className="min-w-0">
-                            <CardTitle className="text-lg truncate">{exam.title}</CardTitle>
-                            <p className="text-sm text-muted-foreground truncate">
-                              {course?.title || "Unknown Course"}
-                            </p>
+                          <div className="flex min-w-0 flex-1 items-start gap-3">
+                            {isCompleted && mcqScore && (
+                              <ScoreRing percent={mcqScore.percent} size={56} />
+                            )}
+                            <div className="min-w-0">
+                              <CardTitle className="text-lg truncate">{exam.title}</CardTitle>
+                              <p className="text-sm text-muted-foreground truncate">
+                                {course?.title || "Unknown Course"}
+                              </p>
+                              {isCompleted && mcqScore && (
+                                <p className="mt-1 text-xs font-medium text-muted-foreground">
+                                  MCQ score: {mcqScore.score} / {mcqScore.maxScore} correct
+                                </p>
+                              )}
+                            </div>
                           </div>
                           {isGraded ? (
                             <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 shrink-0">
@@ -767,6 +791,31 @@ export default function StudentResults() {
                 </DialogHeader>
 
                 <div className="space-y-6">
+                  {(() => {
+                    const ex = getExamById(selectedAttempt.examId);
+                    const mcq =
+                      typeof selectedAttempt.maxScore === "number" &&
+                      selectedAttempt.maxScore > 0
+                        ? {
+                            score: selectedAttempt.score ?? 0,
+                            maxScore: selectedAttempt.maxScore,
+                            percent: Math.round(
+                              ((selectedAttempt.score ?? 0) / selectedAttempt.maxScore) * 100
+                            ),
+                          }
+                        : parseMcqScoreFromFeedback(selectedAttempt.feedback);
+                    if (normalizeExamType(ex?.examType) === "mcq" && mcq) {
+                      return (
+                        <div className="flex flex-col items-center py-2">
+                          <ScoreRing percent={mcq.percent} size={100} />
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {mcq.score} of {mcq.maxScore} questions correct
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       {selectedAttempt.reviewedAt && selectedAttempt.feedback ? (
@@ -817,7 +866,12 @@ export default function StudentResults() {
 
                   {selectedAttempt.feedback && (
                     <div>
-                      <h3 className="text-base font-medium mb-2">Instructor Feedback</h3>
+                      <h3 className="text-base font-medium mb-2">
+                        {normalizeExamType(getExamById(selectedAttempt.examId)?.examType) ===
+                        "mcq"
+                          ? "Result"
+                          : "Instructor Feedback"}
+                      </h3>
                       <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
                         <p className="text-gray-900 whitespace-pre-wrap text-sm">
                           {selectedAttempt.feedback}

@@ -21,7 +21,18 @@ import {
   insertLessonProgressSchema
 } from "@shared/schema";
 import { parseQuestionsFromText, parseQuestionsFromDocx, extractImagesFromPdfBuffer } from "./pdf-questions";
+import { countParseStats } from "./mcq-question-parse";
+import {
+  gradeMcqAnswers,
+  normalizeExamType,
+  stripQuestionForStudent,
+  validateMcqQuestionPayload,
+} from "./exam-mcq-utils";
 import { PDFParse } from "pdf-parse";
+
+function isAdminUser(user: { role?: string } | undefined): boolean {
+  return user?.role === "admin" || user?.role === "superadmin";
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static files from uploads directory
@@ -993,7 +1004,7 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
       if (questions.length === 0) {
         return res.status(422).json({
           message:
-            "No questions found. Use numbered items like Q1. / 1. / Question 1: and optional Answer: lines.",
+            "No questions found. Number each question (1. / Q1.), list options as A) B) C) D), then add a line like Answer: B.",
           questions: [],
           pageCount,
         });
@@ -1004,6 +1015,7 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
         total: questions.length,
         pageCount,
         fileName: req.file.originalname,
+        parseStats: countParseStats(questions),
       });
     } catch (error: any) {
       console.error("Failed to parse questions document:", error);
@@ -1086,6 +1098,7 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
           req.body.batchId === "none"
             ? null
             : Number(req.body.batchId),
+        examType: normalizeExamType(req.body.examType),
       });
       
       // Check if course belongs to user's tenant
@@ -1145,6 +1158,7 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
         startTime: z.string().transform(str => new Date(str)).optional(),
         endTime: z.string().transform(str => new Date(str)).optional(),
         acceptingResponses: z.boolean().optional(),
+        examType: z.enum(["theory", "mcq"]).optional(),
       });
       
       const validatedData = updateSchema.parse({
@@ -1225,7 +1239,11 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
       }
       
       const questions = await storage.getQuestionsByExam(examId);
-      res.json(questions);
+      if (isAdminUser(req.user)) {
+        res.json(questions);
+      } else {
+        res.json(questions.map((q) => stripQuestionForStudent(q)));
+      }
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch questions" });
     }
@@ -1279,14 +1297,33 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
       const existingQuestions = await storage.getQuestionsByExam(examId);
       const nextOrder = existingQuestions.length;
       
-      const questionData = {
+      const examType = normalizeExamType(exam.examType);
+      const questionNumber =
+        req.body.order !== undefined ? Number(req.body.order) + 1 : nextOrder + 1;
+
+      let questionData: Record<string, unknown> = {
         examId,
         text: req.body.text,
         order: req.body.order !== undefined ? req.body.order : nextOrder,
         modelAnswer: req.body.modelAnswer ?? null,
         imageUrl: req.body.imageUrl ?? null,
+        options: examType === "mcq" ? req.body.options ?? null : null,
+        correctOption: examType === "mcq" ? req.body.correctOption ?? null : null,
       };
-      
+
+      if (examType === "mcq") {
+        const check = validateMcqQuestionPayload(
+          String(questionData.text ?? ""),
+          questionData.options,
+          questionData.correctOption,
+          questionNumber
+        );
+        if ("error" in check) {
+          return res.status(400).json({ message: check.error });
+        }
+        questionData = { ...questionData, options: check.options, correctOption: check.correctOption };
+      }
+
       const validatedData = insertQuestionSchema.parse(questionData);
       const question = await storage.createQuestion(validatedData);
       
@@ -1486,61 +1523,72 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
         return res.status(404).json({ message: "Exam attempt not found" });
       }
       
-      // Check if attempt belongs to user or user is admin
-      if (attempt.userId !== req.user!.id && req.user!.role !== "admin") {
+      const isOwner = attempt.userId === req.user!.id;
+      const isAdmin = isAdminUser(req.user);
+      if (!isOwner && !isAdmin) {
         return res.status(403).json({ message: "Access denied to this exam attempt" });
       }
 
-      // One attempt: cannot modify after submit
       if (attempt.completedAt) {
         return res.status(403).json({
           message: "This exam was already submitted. Only one attempt is allowed.",
         });
       }
-      
-      // For assignment-style exams, we don't automatically score - instructor will review
-      if (req.body.completedAt && req.body.answers) {
+
+      const updatePayload: Record<string, unknown> = {};
+      if (req.body.answers !== undefined) {
+        updatePayload.answers = req.body.answers;
+      }
+
+      let questionResults: Record<number, boolean> | undefined;
+
+      if (req.body.completedAt) {
         const exam = await storage.getExam(attempt.examId);
         if (!exam) {
           return res.status(404).json({ message: "Exam not found" });
         }
-        const questions = await storage.getQuestionsByExam(attempt.examId);
-        
-        // Check if exam is still accepting responses
         if (exam.acceptingResponses === false) {
           return res.status(403).json({ message: "This exam is no longer accepting responses" });
         }
-        
-        // Fix the completedAt timestamp - convert string to Date object
-        if (typeof req.body.completedAt === 'string') {
-          req.body.completedAt = new Date(req.body.completedAt);
-        }
-        
-        // Handle answers as JSON string or object
-        if (typeof req.body.answers === 'string') {
+
+        updatePayload.completedAt =
+          typeof req.body.completedAt === "string"
+            ? new Date(req.body.completedAt)
+            : req.body.completedAt;
+
+        if (typeof updatePayload.answers === "string") {
           try {
-            req.body.answers = JSON.parse(req.body.answers);
+            updatePayload.answers = JSON.parse(updatePayload.answers as string);
           } catch (e) {
             console.error("Error parsing answers JSON:", e);
           }
         }
-        
-        // Store the answers but don't calculate a score - will be reviewed by instructor
-        // Set a null score to indicate it needs review
-        req.body.score = null;
-        
-        // Create activity log
+
+        if (normalizeExamType(exam.examType) === "mcq") {
+          const questions = await storage.getQuestionsByExam(attempt.examId);
+          const graded = gradeMcqAnswers(questions, updatePayload.answers);
+          updatePayload.score = graded.score;
+          updatePayload.maxScore = graded.maxScore;
+          updatePayload.feedback = graded.feedback;
+          updatePayload.reviewedAt = new Date();
+          questionResults = graded.questionResults;
+        }
+
         await storage.createActivityLog({
           userId: req.user!.id,
           activityType: "exam_complete",
           resourceId: attempt.examId,
           resourceType: "exam",
-          tenantId: req.user!.tenantId
+          tenantId: req.user!.tenantId,
         });
       }
-      
-      const updatedAttempt = await storage.updateExamAttempt(attemptId, req.body);
-      res.json(updatedAttempt);
+
+      const updatedAttempt = await storage.updateExamAttempt(attemptId, updatePayload as any);
+      if (questionResults) {
+        res.json({ ...updatedAttempt, questionResults });
+      } else {
+        res.json(updatedAttempt);
+      }
     } catch (error) {
       console.error("Failed to update exam attempt:", error);
       res.status(500).json({ message: "Failed to update exam attempt" });

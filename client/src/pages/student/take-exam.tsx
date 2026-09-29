@@ -52,6 +52,7 @@ export default function StudentTakeExam() {
         description: exam.description,
         duration: exam.duration,
         acceptingResponses: exam.acceptingResponses,
+        examType: exam.examType,
       }}
     />
   );

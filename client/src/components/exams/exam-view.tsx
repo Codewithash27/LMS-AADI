@@ -2,7 +2,24 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { BookOpen, Clock, LogOut, AlertTriangle } from "lucide-react";
+import {
+  BookOpen,
+  Clock,
+  LogOut,
+  AlertTriangle,
+  Trophy,
+  CheckCircle2,
+  XCircle,
+  ListChecks,
+  Target,
+  Sparkles,
+} from "lucide-react";
+import { Link } from "wouter";
+import {
+  mcqEncouragement,
+  normalizeExamType,
+  parseMcqScoreFromFeedback,
+} from "@/lib/exam-mcq";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
@@ -22,6 +39,14 @@ type ExamQuestion = {
   text: string;
   order: number;
   imageUrl?: string | null;
+  options?: string[] | null;
+};
+
+type SubmitOutcome = {
+  score: number | null;
+  maxScore: number | null;
+  percent: number | null;
+  questionResults: Record<number, boolean> | null;
 };
 
 type ExamViewProps = {
@@ -33,6 +58,7 @@ type ExamViewProps = {
     description: string;
     duration?: number;
     acceptingResponses?: boolean;
+    examType?: string;
   };
   /** dialog kept for compatibility; page = MCQ-style secure shell */
   mode?: "dialog" | "page";
@@ -120,7 +146,10 @@ export default function ExamView({
   const [isExitDialogOpen, setIsExitDialogOpen] = useState(false);
   const [violations, setViolations] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [submitOutcome, setSubmitOutcome] = useState<SubmitOutcome | null>(null);
   const { toast } = useToast();
+
+  const isMcqExam = normalizeExamType(exam?.examType) === "mcq";
 
   const answersRef = useRef(answers);
   const examAttemptIdRef = useRef(examAttemptId);
@@ -240,9 +269,31 @@ export default function ExamView({
       setIsSubmitting(true);
       isSubmittingRef.current = true;
       try {
-        await apiRequest("PUT", `/api/exam-attempts/${attemptId}`, {
+        const response = await apiRequest("PUT", `/api/exam-attempts/${attemptId}`, {
           completedAt: new Date().toISOString(),
           answers: JSON.stringify(answersRef.current),
+        });
+        const data = await response.json();
+
+        let score: number | null = typeof data.score === "number" ? data.score : null;
+        let maxScore: number | null = typeof data.maxScore === "number" ? data.maxScore : null;
+        if (score == null || maxScore == null) {
+          const parsed = parseMcqScoreFromFeedback(data.feedback);
+          if (parsed) {
+            score = parsed.score;
+            maxScore = parsed.maxScore;
+          }
+        }
+        const percent =
+          score != null && maxScore != null && maxScore > 0
+            ? Math.round((score / maxScore) * 100)
+            : null;
+
+        setSubmitOutcome({
+          score,
+          maxScore,
+          percent,
+          questionResults: (data.questionResults as Record<number, boolean>) ?? null,
         });
         setSubmitted(true);
         submittedRef.current = true;
@@ -255,12 +306,11 @@ export default function ExamView({
                 : "Exam submitted",
           description:
             reason === "tab-switch"
-              ? "You left the tab again. Your answers have been submitted."
-              : "Your exam has been submitted. You cannot retake it.",
+              ? "Your answers have been submitted."
+              : "See your result below.",
           variant: reason === "tab-switch" ? "destructive" : "default",
         });
         queryClient.invalidateQueries({ queryKey: ["/api/exam-attempts/user"] });
-        closeExam();
       } catch {
         toast({
           title: "Error submitting exam",
@@ -273,8 +323,12 @@ export default function ExamView({
         setIsSubmitDialogOpen(false);
       }
     },
-    [exam, toast, closeExam]
+    [exam, toast]
   );
+
+  const leaveAfterSubmit = useCallback(() => {
+    window.location.href = "/student/upcoming-exams";
+  }, []);
 
   // Same anti-cheat as MCQ take-quiz: block copy/paste; 1st leave = warn, 2nd = auto-submit
   useEffect(() => {
@@ -443,6 +497,345 @@ export default function ExamView({
     );
   }
 
+  const scoreRing = (percent: number, size = 120, light = false) => {
+    const r = 42;
+    const c = 2 * Math.PI * r;
+    const offset = c * (1 - Math.min(100, Math.max(0, percent)) / 100);
+    const stroke = percent >= 80 ? "#4ade80" : percent >= 60 ? "#fbbf24" : "#f87171";
+    const track = light ? "rgba(255,255,255,0.25)" : "#e5e7eb";
+    return (
+      <div className="relative mx-auto" style={{ width: size, height: size }}>
+        <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r={r} fill="none" stroke={track} strokeWidth="8" />
+          <circle
+            cx="50"
+            cy="50"
+            r={r}
+            fill="none"
+            stroke={stroke}
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeDasharray={c}
+            strokeDashoffset={offset}
+            className="drop-shadow-sm"
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span
+            className={cn(
+              "text-2xl font-bold tabular-nums",
+              light ? "text-white" : "text-gray-900"
+            )}
+          >
+            {percent}%
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  const questionResultStats = (() => {
+    const results = submitOutcome?.questionResults;
+    if (!results) return null;
+    let correct = 0;
+    let incorrect = 0;
+    let unanswered = 0;
+    for (const q of questions) {
+      const ans = (answers[q.id] || "").trim();
+      const ok = results[q.id];
+      if (!ans) unanswered += 1;
+      else if (ok === true) correct += 1;
+      else if (ok === false) incorrect += 1;
+    }
+    return { correct, incorrect, unanswered };
+  })();
+
+  const resultPanel = submitted && (
+    <div className="grid h-full w-full grid-cols-1 overflow-hidden rounded-2xl border border-white/40 shadow-xl md:grid-cols-[minmax(260px,300px)_1fr] lg:grid-cols-[minmax(280px,320px)_1fr]">
+      <aside className="relative flex flex-col gap-5 overflow-y-auto bg-gradient-to-br from-primary via-[#14B8A6] to-brand-blue px-5 py-6 text-white">
+        <div className="pointer-events-none absolute -right-8 -top-8 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
+        <div className="pointer-events-none absolute bottom-0 left-0 h-28 w-28 rounded-full bg-black/10 blur-2xl" />
+
+        <div className="relative z-10">
+          <Badge className="mb-3 border-white/30 bg-white/15 text-[10px] font-semibold uppercase tracking-wider text-white hover:bg-white/15">
+            {isMcqExam ? "MCQ result" : "Submission received"}
+          </Badge>
+          <p className="text-[11px] font-medium text-white/75">Exam complete</p>
+          <h2 className="mt-1 line-clamp-2 text-lg font-bold leading-snug tracking-tight">
+            {exam?.title || "Exam"}
+          </h2>
+        </div>
+
+        {submitOutcome?.percent != null && submitOutcome.maxScore != null ? (
+          <div className="relative z-10 flex flex-col items-center text-center">
+            <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25">
+              <Trophy className="h-6 w-6 text-amber-200" />
+            </div>
+            {scoreRing(submitOutcome.percent, 132, true)}
+            <p className="mt-4 text-base font-semibold">
+              {submitOutcome.score ?? 0}{" "}
+              <span className="font-medium text-white/80">of</span>{" "}
+              {submitOutcome.maxScore}{" "}
+              <span className="font-medium text-white/80">correct</span>
+            </p>
+            <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-white/90">
+              <Sparkles className="h-4 w-4 text-amber-200" />
+              {mcqEncouragement(submitOutcome.percent)}
+            </p>
+            {questionResultStats && (
+              <div className="mt-6 grid w-full grid-cols-3 gap-2">
+                <div className="rounded-xl bg-white/10 px-2 py-2.5 ring-1 ring-white/15">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-white/70">
+                    Correct
+                  </p>
+                  <p className="mt-0.5 text-xl font-bold tabular-nums">
+                    {questionResultStats.correct}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-white/10 px-2 py-2.5 ring-1 ring-white/15">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-white/70">
+                    Wrong
+                  </p>
+                  <p className="mt-0.5 text-xl font-bold tabular-nums">
+                    {questionResultStats.incorrect}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-white/10 px-2 py-2.5 ring-1 ring-white/15">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-white/70">
+                    Skipped
+                  </p>
+                  <p className="mt-0.5 text-xl font-bold tabular-nums">
+                    {questionResultStats.unanswered}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="relative z-10 flex flex-col items-center py-4 text-center">
+            <CheckCircle2 className="h-14 w-14 text-emerald-200" />
+            <h3 className="mt-4 text-lg font-bold">Exam submitted</h3>
+            <p className="mt-2 text-sm text-white/85">
+              {isMcqExam
+                ? "Your score will appear on Results once grading finishes."
+                : "Your instructor will review your written answers."}
+            </p>
+          </div>
+        )}
+
+        <div className="relative z-10 mt-auto flex flex-col gap-2 pt-2">
+          <Link href="/student/upcoming-exams">
+            <Button className="w-full rounded-xl bg-white text-primary shadow-md hover:bg-white/95">
+              Back to exams
+            </Button>
+          </Link>
+          <Link href="/student/results">
+            <Button
+              variant="outline"
+              className="w-full rounded-xl border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white"
+            >
+              View all results
+            </Button>
+          </Link>
+        </div>
+      </aside>
+
+      <section className="flex min-h-0 min-w-0 flex-col bg-[#F4F8F9]">
+        <div className="shrink-0 border-b border-border bg-white/70 px-4 py-4 backdrop-blur-sm sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2">
+            <ListChecks className="h-5 w-5 text-primary" />
+            <div>
+              <h3 className="text-base font-bold text-gray-900">Answer review</h3>
+              <p className="text-xs text-muted-foreground">
+                {questions.length} question{questions.length === 1 ? "" : "s"} · compare your
+                responses
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 space-y-4 overflow-y-auto px-4 py-5 sm:px-6 lg:px-8">
+          {questions.map((q, idx) => {
+            const ans = (answers[q.id] || "").trim();
+            const ok = submitOutcome?.questionResults?.[q.id];
+            const hasResult = submitOutcome?.questionResults != null;
+            const showMcqOptions =
+              isMcqExam && q.options && q.options.filter((o) => o.trim()).length >= 2;
+            const cleanText = getCleanQuestionText(q.text);
+            const imgUrl = getQuestionImageUrl(q);
+
+            return (
+              <article
+                key={q.id}
+                className={cn(
+                  "overflow-hidden rounded-2xl border bg-white shadow-sm transition-shadow hover:shadow-md",
+                  hasResult && ok === true && "border-emerald-200/80",
+                  hasResult && ok === false && "border-red-200/80",
+                  hasResult && ok == null && "border-border",
+                  !hasResult && "border-border"
+                )}
+              >
+                <div
+                  className={cn(
+                    "flex items-start justify-between gap-3 border-b px-4 py-3 sm:px-5",
+                    hasResult && ok === true && "bg-emerald-50/80",
+                    hasResult && ok === false && "bg-red-50/60",
+                    !hasResult && "bg-slate-50/80"
+                  )}
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span
+                      className={cn(
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold",
+                        hasResult && ok === true && "bg-emerald-600 text-white",
+                        hasResult && ok === false && "bg-red-500 text-white",
+                        !hasResult && "bg-primary/10 text-primary"
+                      )}
+                    >
+                      {idx + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Question {idx + 1}
+                      </p>
+                      {hasResult && (
+                        <p
+                          className={cn(
+                            "text-sm font-semibold",
+                            ok === true && "text-emerald-800",
+                            ok === false && "text-red-800"
+                          )}
+                        >
+                          {ok === true ? "Correct" : ok === false ? "Incorrect" : "Submitted"}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {hasResult &&
+                    (ok ? (
+                      <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600" />
+                    ) : (
+                      <XCircle className="h-6 w-6 shrink-0 text-red-500" />
+                    ))}
+                </div>
+
+                <div className="space-y-4 px-4 py-4 sm:px-5 sm:py-5">
+                  <p className="text-base font-medium leading-relaxed text-gray-900">{cleanText}</p>
+
+                  {imgUrl && (
+                    <div className="max-w-xl overflow-hidden rounded-xl border border-border bg-slate-50 p-2">
+                      <img
+                        src={imgUrl}
+                        alt={`Question ${idx + 1} illustration`}
+                        className="max-h-64 w-auto rounded-lg object-contain"
+                      />
+                    </div>
+                  )}
+
+                  {showMcqOptions ? (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Your selection
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        {q.options!.map((opt, optIdx) => {
+                          const letter = String.fromCharCode(65 + optIdx);
+                          const trimmed = opt.trim();
+                          if (!trimmed) return null;
+                          const selected = ans === trimmed;
+                          return (
+                            <div
+                              key={optIdx}
+                              className={cn(
+                                "flex items-center gap-3 rounded-xl border-2 px-3 py-2.5 text-sm",
+                                selected &&
+                                  hasResult &&
+                                  ok === true &&
+                                  "border-emerald-500 bg-emerald-50 text-emerald-900",
+                                selected &&
+                                  hasResult &&
+                                  ok === false &&
+                                  "border-red-400 bg-red-50 text-red-900",
+                                selected && !hasResult && "border-primary bg-primary/5",
+                                !selected && "border-border/80 bg-slate-50/50 text-gray-700"
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+                                  selected ? "bg-black/10" : "bg-white"
+                                )}
+                              >
+                                {letter}
+                              </span>
+                              <span className="flex-1">{trimmed}</span>
+                              {selected && (
+                                <Badge
+                                  variant="outline"
+                                  className="shrink-0 rounded-full text-[10px] uppercase"
+                                >
+                                  Yours
+                                </Badge>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      className={cn(
+                        "rounded-xl border px-4 py-3",
+                        hasResult && ok === true && "border-emerald-200 bg-emerald-50/50",
+                        hasResult && ok === false && "border-red-200 bg-red-50/40",
+                        !hasResult && "border-sky-200 bg-sky-50/60"
+                      )}
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Your answer
+                      </p>
+                      <p
+                        className={cn(
+                          "mt-1.5 text-sm leading-relaxed",
+                          hasResult && ok === true && "text-emerald-900",
+                          hasResult && ok === false && "text-red-900",
+                          !hasResult && "text-gray-900"
+                        )}
+                      >
+                        {ans || (
+                          <span className="italic text-muted-foreground">No answer provided</span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-white/80 px-4 py-3 backdrop-blur-sm sm:px-6 lg:px-8">
+          <p className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
+            <Target className="h-3.5 w-3.5" />
+            Results are saved to your profile
+          </p>
+          <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row">
+            <Link href="/student/results">
+              <Button variant="outline" className="w-full rounded-xl sm:w-auto">
+                All results
+              </Button>
+            </Link>
+            <Link href="/student/upcoming-exams">
+              <Button className="w-full rounded-xl bg-accent-brand text-white sm:w-auto">
+                Continue learning
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+
   const arena = (
     <div className="grid h-full w-full grid-cols-1 overflow-hidden rounded-2xl border border-white/40 shadow-xl md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr]">
       {/* Left: MCQ-style gradient panel + circular timer */}
@@ -565,7 +958,7 @@ export default function ExamView({
         <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-white/80 px-3 py-1 text-[11px] font-medium text-muted-foreground shadow-sm">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-turquoise" />
-            Type your answer
+            {isMcqExam ? "Choose one option" : "Type your answer"}
           </div>
 
           <h2 className="max-w-3xl text-lg font-bold leading-snug text-gray-900 sm:text-xl lg:text-2xl">
@@ -583,20 +976,50 @@ export default function ExamView({
           )}
 
           <div className="mt-5 max-w-3xl sm:mt-6">
-            <Textarea
-              value={answers[currentQuestion?.id] || ""}
-              onChange={(e) => {
-                if (!currentQuestion) return;
-                if (exam?.acceptingResponses === false) return;
-                setAnswers((prev) => ({
-                  ...prev,
-                  [currentQuestion.id]: e.target.value,
-                }));
-              }}
-              placeholder="Type your answer here..."
-              className="min-h-[220px] w-full rounded-2xl border-0 bg-white/90 p-4 text-base shadow-sm focus-visible:ring-2 focus-visible:ring-primary/40"
-              disabled={exam?.acceptingResponses === false}
-            />
+            {isMcqExam && currentQuestion?.options && currentQuestion.options.length >= 2 ? (
+              <div className="flex flex-col gap-3">
+                {currentQuestion.options.map((opt, optIdx) => {
+                  const letter = String.fromCharCode(65 + optIdx);
+                  const selected = (answers[currentQuestion.id] || "").trim() === opt.trim();
+                  return (
+                    <button
+                      key={optIdx}
+                      type="button"
+                      disabled={exam?.acceptingResponses === false}
+                      onClick={() =>
+                        setAnswers((prev) => ({ ...prev, [currentQuestion.id]: opt }))
+                      }
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left text-base shadow-sm transition-all",
+                        selected
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border bg-white/90 hover:border-primary/40"
+                      )}
+                    >
+                      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/5 text-sm font-bold">
+                        {letter}
+                      </span>
+                      <span>{opt}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <Textarea
+                value={answers[currentQuestion?.id] || ""}
+                onChange={(e) => {
+                  if (!currentQuestion) return;
+                  if (exam?.acceptingResponses === false) return;
+                  setAnswers((prev) => ({
+                    ...prev,
+                    [currentQuestion.id]: e.target.value,
+                  }));
+                }}
+                placeholder="Type your answer here..."
+                className="min-h-[220px] w-full rounded-2xl border-0 bg-white/90 p-4 text-base shadow-sm focus-visible:ring-2 focus-visible:ring-primary/40"
+                disabled={exam?.acceptingResponses === false}
+              />
+            )}
             {(answers[currentQuestion?.id] || "").trim() !== "" && (
               <Badge className="mt-2 rounded-full border-green-200 bg-green-50 text-green-800">
                 Answer saved for this question
@@ -676,7 +1099,7 @@ export default function ExamView({
             variant="outline"
             size="sm"
             className="h-7 gap-1 border-white/30 bg-white/10 px-2 text-xs text-white hover:bg-white/20 hover:text-white"
-            onClick={() => setIsExitDialogOpen(true)}
+            onClick={() => (submitted ? leaveAfterSubmit() : setIsExitDialogOpen(true))}
           >
             <LogOut className="h-3 w-3" />
             Exit
@@ -685,7 +1108,7 @@ export default function ExamView({
       </header>
 
       <main className="flex min-h-0 flex-1 flex-col p-2 sm:p-3 md:p-4">
-        {arena}
+        {submitted ? resultPanel : arena}
       </main>
 
       {dialogs}

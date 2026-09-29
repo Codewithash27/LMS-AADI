@@ -272,9 +272,22 @@ export default function AdminExams() {
                       <FileText className="h-5 w-5 text-primary" />
                     </div>
                     <div className="min-w-0 max-w-[280px]">
-                      <p className="truncate text-[15px] font-semibold text-[#2D3748]">
-                        {exam.title}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-[15px] font-semibold text-[#2D3748]">
+                          {exam.title}
+                        </p>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "shrink-0 rounded-full text-[10px] font-bold uppercase",
+                            exam.examType === "mcq"
+                              ? "border-indigo-200 bg-indigo-50 text-indigo-800"
+                              : "border-amber-200 bg-amber-50 text-amber-800"
+                          )}
+                        >
+                          {exam.examType === "mcq" ? "MCQ" : "Theory"}
+                        </Badge>
+                      </div>
                       <p className="truncate text-xs text-muted-foreground">
                         {exam.description?.trim() || "No description"}
                       </p>

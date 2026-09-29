@@ -30,6 +30,7 @@ export const createStudentSchema = z.object({
 export type CreateStudentFormValues = z.infer<typeof createStudentSchema>;
 
 export const examFormSchema = z.object({
+  examType: z.enum(["theory", "mcq"]).default("theory"),
   title: z.string().min(3, "Title must be at least 3 characters"),
   description: z.string().min(1, "Description is required"),
   courseId: z.string().min(1, "Please select a course"),
@@ -41,7 +42,10 @@ export const examFormSchema = z.object({
     .max(600, "Duration cannot exceed 600 minutes"),
   acceptingResponses: z.boolean().default(true),
   questionSource: z.enum(["manual", "pdf"]).default("manual"),
-  questionCount: z.coerce.number().int().min(1).optional(),
+  questionCount: z.preprocess(
+    (v) => (v === "" || v === undefined || v === null ? undefined : Number(v)),
+    z.number().int().min(1).optional()
+  ),
 });
 
 export type ExamFormValues = z.infer<typeof examFormSchema>;

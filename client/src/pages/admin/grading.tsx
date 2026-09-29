@@ -22,6 +22,7 @@ import { useClientPagination } from "@/hooks/use-client-pagination";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { getQuestionImageUrl, getCleanQuestionText } from "@/components/exams/exam-view";
+import { normalizeExamType } from "@/lib/exam-mcq";
 
 type ExamAttempt = {
   id: number;
@@ -42,6 +43,7 @@ type ExamAttempt = {
     id: number;
     title: string;
     description: string;
+    examType?: string;
   };
 };
 
@@ -51,6 +53,8 @@ type Question = {
   order: number;
   examId: number;
   imageUrl?: string | null;
+  options?: string[] | null;
+  correctOption?: number | null;
 };
 
 export default function GradingPage() {
@@ -271,12 +275,39 @@ export default function GradingPage() {
                 Student Answers
               </h3>
               <div className="space-y-4">
-                {questions?.map((question: Question, index: number) => (
+                {questions?.map((question: Question, index: number) => {
+                  const isMcq = normalizeExamType(selectedAttempt?.exam?.examType) === "mcq";
+                  const studentAnswer =
+                    selectedAttempt?.answers?.[question.id] ??
+                    (selectedAttempt?.answers as Record<string, string>)?.[String(question.id)];
+                  const opts = question.options ?? [];
+                  const expected =
+                    question.correctOption != null ? opts[question.correctOption] : null;
+                  const isCorrect =
+                    isMcq &&
+                    expected != null &&
+                    typeof studentAnswer === "string" &&
+                    studentAnswer.trim().toLowerCase() === expected.trim().toLowerCase();
+
+                  return (
                   <div
                     key={question.id}
                     className="rounded-2xl border border-border bg-white p-4 shadow-sm"
                   >
-                    <h4 className="mb-2 font-semibold">Question {index + 1}</h4>
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <h4 className="font-semibold">Question {index + 1}</h4>
+                      {isMcq && expected != null && (
+                        <Badge
+                          className={
+                            isCorrect
+                              ? "bg-green-100 text-green-800 hover:bg-green-100"
+                              : "bg-red-100 text-red-800 hover:bg-red-100"
+                          }
+                        >
+                          {isCorrect ? "Correct" : "Incorrect"}
+                        </Badge>
+                      )}
+                    </div>
                     <p className="mb-3 leading-relaxed text-[#2D3748]">
                       {getCleanQuestionText(question.text)}
                     </p>
@@ -294,13 +325,17 @@ export default function GradingPage() {
                         Student Answer:
                       </Label>
                       <p className="mt-2 leading-relaxed text-[#2D3748]">
-                        {selectedAttempt?.answers?.[question.id] || (
+                        {studentAnswer || (
                           <span className="italic text-[#A0AEC0]">No answer provided</span>
                         )}
                       </p>
+                      {isMcq && !isCorrect && expected != null && (
+                        <p className="mt-2 text-sm text-red-700">Correct answer: {expected}</p>
+                      )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -310,7 +345,9 @@ export default function GradingPage() {
                 className="mb-2 flex items-center gap-2 text-lg font-semibold"
               >
                 <FileText className="h-5 w-5 text-primary" />
-                Instructor Feedback
+                {normalizeExamType(selectedAttempt?.exam?.examType) === "mcq"
+                  ? "Result / feedback"
+                  : "Instructor Feedback"}
               </Label>
               <Textarea
                 id="feedback"
