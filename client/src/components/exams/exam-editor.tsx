@@ -61,6 +61,37 @@ type ParsedPdfQuestion = {
   imageUrl?: string | null;
 };
 
+<<<<<<< HEAD
+=======
+const DEFAULT_MCQ_OPTIONS = ["", "", "", ""];
+
+function ensureMcqOptions(q: QuestionType): QuestionType {
+  const opts = [...(q.options?.length ? q.options : DEFAULT_MCQ_OPTIONS)];
+  while (opts.length < 4) opts.push("");
+  return { ...q, options: opts.slice(0, 6), correctOption: q.correctOption ?? null };
+}
+
+function buildQuestionsFromPool(
+  pool: ParsedPdfQuestion[],
+  count: number,
+  isMcq: boolean
+): QuestionType[] {
+  const picked = shufflePick(pool, count);
+  return picked.map((q, index) => {
+    const base: QuestionType = {
+      id: index + 1,
+      text: q.text,
+      order: index,
+      modelAnswer: q.modelAnswer ?? null,
+      imageUrl: q.imageUrl ?? null,
+      options: q.options?.slice(0, 6),
+      correctOption: q.correctOption ?? null,
+    };
+    return isMcq ? ensureMcqOptions(base) : base;
+  });
+}
+
+>>>>>>> 6ad5e77615f716cf66ed0d0cf43601bb0ae769d2
 type ExamEditorProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -192,6 +223,7 @@ export default function ExamEditor({
   // Users can select any batch, and the server will validate if the course is assigned to that batch
 
   const applyRandomFromPoolWith = (pool: ParsedPdfQuestion[], count: number) => {
+<<<<<<< HEAD
     const picked = shufflePick(pool, count);
     setQuestions(
       picked.map((q, index) => ({
@@ -202,6 +234,10 @@ export default function ExamEditor({
         imageUrl: q.imageUrl ?? null,
       }))
     );
+=======
+    const isMcq = form.getValues("examType") === "mcq";
+    setQuestions(buildQuestionsFromPool(pool, count, isMcq));
+>>>>>>> 6ad5e77615f716cf66ed0d0cf43601bb0ae769d2
   };
 
   const applyRandomFromPool = (count?: number) => {
@@ -314,11 +350,14 @@ export default function ExamEditor({
   };
 
   const onSubmit = async (data: ExamFormValues) => {
+    let questionsToSave = questions;
     if (data.questionSource === "pdf" && pdfPool.length > 0 && questions.length === 0) {
-      applyRandomFromPool(data.questionCount);
+      const n = data.questionCount ?? pdfPool.length;
+      questionsToSave = buildQuestionsFromPool(pdfPool, n, data.examType === "mcq");
+      setQuestions(questionsToSave);
     }
 
-    const emptyQuestions = questions.filter((q) => !q.text.trim() && !q.imageUrl);
+    const emptyQuestions = questionsToSave.filter((q) => !q.text.trim() && !q.imageUrl);
     if (emptyQuestions.length > 0) {
       toast({
         title: "Incomplete questions",
@@ -328,7 +367,7 @@ export default function ExamEditor({
       return;
     }
 
-    if (questions.length === 0) {
+    if (questionsToSave.length === 0) {
       toast({
         title: "No questions",
         description: "Add questions manually or upload a PDF / Word document question bank.",
@@ -337,6 +376,24 @@ export default function ExamEditor({
       return;
     }
 
+<<<<<<< HEAD
+=======
+    if (data.examType === "mcq") {
+      for (let i = 0; i < questionsToSave.length; i++) {
+        const err = validateMcqQuestionClient(
+          questionsToSave[i].text,
+          questionsToSave[i].options ?? [],
+          questionsToSave[i].correctOption,
+          i + 1
+        );
+        if (err) {
+          toast({ title: "Cannot save MCQ exam", description: err, variant: "destructive" });
+          return;
+        }
+      }
+    }
+
+>>>>>>> 6ad5e77615f716cf66ed0d0cf43601bb0ae769d2
     setIsSaving(true);
     try {
       const payload = {
@@ -371,8 +428,32 @@ export default function ExamEditor({
         try {
           await apiRequest("DELETE", `/api/exams/${examId}/questions`);
 
+<<<<<<< HEAD
           for (let index = 0; index < questions.length; index++) {
             const question = questions[index];
+=======
+          for (let index = 0; index < questionsToSave.length; index++) {
+            const question = questionsToSave[index];
+            let text = question.text;
+            let options: string[] | null = null;
+            let correctOption: number | null = null;
+            const modelAnswer = question.modelAnswer || null;
+
+            if (data.examType === "mcq") {
+              const normalized = normalizeMcqOptions(
+                question.options ?? [],
+                question.correctOption
+              );
+              options = normalized.options;
+              correctOption = normalized.correctOption;
+            } else if (question.options && question.options.length >= 2) {
+              const lines = question.options
+                .map((opt, i) => `${OPTION_LETTERS[i]}) ${opt.trim()}`)
+                .filter((l) => l.length > 3);
+              if (lines.length) text = `${text.trim()}\n${lines.join("\n")}`.trim();
+            }
+
+>>>>>>> 6ad5e77615f716cf66ed0d0cf43601bb0ae769d2
             await apiRequest("POST", `/api/exams/${examId}/questions`, {
               text: question.text,
               order: index,
@@ -407,6 +488,7 @@ export default function ExamEditor({
   };
 
   const addQuestion = () => {
+<<<<<<< HEAD
     const newQuestionId =
       questions.length > 0 ? Math.max(...questions.map((q) => q.id)) + 1 : 1;
 
@@ -420,18 +502,70 @@ export default function ExamEditor({
         imageUrl: null,
       },
     ]);
+=======
+    setQuestions((prev) => {
+      const newQuestionId =
+        prev.length > 0 ? Math.max(...prev.map((q) => q.id)) + 1 : 1;
+      const base: QuestionType = {
+        id: newQuestionId,
+        text: "",
+        order: prev.length,
+        modelAnswer: null,
+        imageUrl: null,
+      };
+      return [...prev, examType === "mcq" ? ensureMcqOptions(base) : base];
+    });
+  };
+
+  const updateQuestionOptions = (questionId: number, options: string[]) => {
+    setQuestions((prev) => prev.map((q) => (q.id === questionId ? { ...q, options } : q)));
+  };
+
+  const setCorrectOption = (questionId: number, index: number) => {
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === questionId ? { ...q, correctOption: index } : q))
+    );
+  };
+
+  const addOptionToQuestion = (questionId: number) => {
+    setQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id !== questionId) return q;
+        const opts = [...(q.options ?? DEFAULT_MCQ_OPTIONS)];
+        if (opts.length >= 6) return q;
+        return { ...q, options: [...opts, ""] };
+      })
+    );
+  };
+
+  const removeOptionFromQuestion = (questionId: number, optIndex: number) => {
+    setQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id !== questionId) return q;
+        const opts = [...(q.options ?? DEFAULT_MCQ_OPTIONS)];
+        if (opts.length <= 2) return q;
+        opts.splice(optIndex, 1);
+        let correctOption = q.correctOption;
+        if (correctOption != null) {
+          if (correctOption === optIndex) correctOption = null;
+          else if (correctOption > optIndex) correctOption -= 1;
+        }
+        return { ...q, options: opts, correctOption };
+      })
+    );
+>>>>>>> 6ad5e77615f716cf66ed0d0cf43601bb0ae769d2
   };
 
   const updateQuestionText = (questionId: number, text: string) => {
-    setQuestions(
-      questions.map((question) =>
+    setQuestions((prev) =>
+      prev.map((question) =>
         question.id === questionId ? { ...question, text } : question
       )
     );
   };
 
   const removeQuestion = (questionId: number) => {
-    setQuestions(questions.filter((question) => question.id !== questionId));
+    setQuestions((prev) => prev.filter((question) => question.id !== questionId));
   };
 
   const isLoading = (isLoadingExam || isLoadingQuestions) && isEditing;
@@ -476,6 +610,61 @@ export default function ExamEditor({
               <div className="space-y-4">
                 <FormField
                   control={form.control}
+<<<<<<< HEAD
+=======
+                  name="examType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className={createFormLabelClass}>
+                        Exam Type <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <button
+                          type="button"
+                          disabled={isSaving}
+                          onClick={() => field.onChange("theory")}
+                          className={
+                            "rounded-xl border p-4 text-left transition-colors " +
+                            (field.value === "theory"
+                              ? "border-primary bg-primary/5"
+                              : "border-border bg-white hover:bg-muted/40")
+                          }
+                        >
+                          <PenLine className="mb-2 h-5 w-5 text-primary" />
+                          <p className="text-sm font-semibold text-[#2D3748]">Theory based</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Students write answers; you grade them manually.
+                          </p>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isSaving}
+                          onClick={() => {
+                            field.onChange("mcq");
+                            setQuestions((prev) => prev.map((q) => ensureMcqOptions(q)));
+                          }}
+                          className={
+                            "rounded-xl border p-4 text-left transition-colors " +
+                            (field.value === "mcq"
+                              ? "border-primary bg-primary/5"
+                              : "border-border bg-white hover:bg-muted/40")
+                          }
+                        >
+                          <ListChecks className="mb-2 h-5 w-5 text-primary" />
+                          <p className="text-sm font-semibold text-[#2D3748]">MCQ based</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Multiple choice with one correct answer; auto-graded.
+                          </p>
+                        </button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+>>>>>>> 6ad5e77615f716cf66ed0d0cf43601bb0ae769d2
                   name="title"
                   render={({ field }) => (
                     <FormItem>
@@ -847,6 +1036,76 @@ export default function ExamEditor({
                       placeholder="e.g. How many triangles are there in the diagram below?"
                     />
 
+<<<<<<< HEAD
+=======
+                    {examType === "mcq" && (
+                      <div className="mt-4 space-y-2">
+                        <FormLabel className={createFormLabelClass}>Answer options</FormLabel>
+                        <p className="text-xs text-muted-foreground">
+                          Fill at least two options, then click a letter to mark the correct answer.
+                        </p>
+                        {(question.options ?? DEFAULT_MCQ_OPTIONS).map((opt, optIdx) => (
+                          <div key={optIdx} className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              disabled={isSaving}
+                              title="Mark as correct"
+                              onClick={() => setCorrectOption(question.id, optIdx)}
+                              className={
+                                "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold " +
+                                (question.correctOption === optIdx
+                                  ? "border-green-600 bg-green-600 text-white"
+                                  : "border-border bg-white text-muted-foreground hover:border-primary")
+                              }
+                            >
+                              {question.correctOption === optIdx ? (
+                                <Check className="h-4 w-4" />
+                              ) : (
+                                OPTION_LETTERS[optIdx] ?? "?"
+                              )}
+                            </button>
+                            <Input
+                              value={opt}
+                              disabled={isSaving}
+                              className={createFormControlClass}
+                              placeholder={`Option ${OPTION_LETTERS[optIdx]}`}
+                              onChange={(e) => {
+                                const next = [...(question.options ?? DEFAULT_MCQ_OPTIONS)];
+                                next[optIdx] = e.target.value;
+                                updateQuestionOptions(question.id, next);
+                              }}
+                            />
+                            {(question.options ?? DEFAULT_MCQ_OPTIONS).length > 2 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-9 w-9 p-0"
+                                onClick={() => removeOptionFromQuestion(question.id, optIdx)}
+                                disabled={isSaving}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                        {(question.options ?? DEFAULT_MCQ_OPTIONS).length < 6 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-9 gap-1 rounded-xl"
+                            onClick={() => addOptionToQuestion(question.id)}
+                            disabled={isSaving}
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Add option
+                          </Button>
+                        )}
+                      </div>
+                    )}
+
+>>>>>>> 6ad5e77615f716cf66ed0d0cf43601bb0ae769d2
                     {/* Question Image Attachment section */}
                     <div className="mt-3.5 rounded-xl border border-border/80 bg-slate-50/50 p-3.5">
                       <div className="flex items-center justify-between mb-2">
