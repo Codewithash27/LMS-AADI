@@ -21,7 +21,7 @@ import {
   insertLessonProgressSchema
 } from "@shared/schema";
 import { parseQuestionsFromText, parseQuestionsFromDocx, extractImagesFromPdfBuffer } from "./pdf-questions";
-import { countParseStats } from "./mcq-question-parse";
+import { countParseStats, sanitizeQuestionStemForMcq } from "./mcq-question-parse";
 import {
   gradeMcqAnswers,
   normalizeExamType,
@@ -1245,7 +1245,11 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
       if (isAdminUser(req.user)) {
         res.json(questions);
       } else {
-        res.json(questions.map((q) => stripQuestionForStudent(q)));
+        res.json(
+          questions.map((q) =>
+            stripQuestionForStudent(q, normalizeExamType(exam.examType))
+          )
+        );
       }
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch questions" });
@@ -1324,7 +1328,13 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
         if ("error" in check) {
           return res.status(400).json({ message: check.error });
         }
-        questionData = { ...questionData, options: check.options, correctOption: check.correctOption };
+        questionData = {
+          ...questionData,
+          text: sanitizeQuestionStemForMcq(String(questionData.text ?? ""), check.options),
+          options: check.options,
+          correctOption: check.correctOption,
+          modelAnswer: null,
+        };
       }
 
       const validatedData = insertQuestionSchema.parse(questionData);

@@ -1,0 +1,352 @@
+MCQ Question Bank — Agile, Power BI, SQL & Tableau (50 Questions)
+Format: numbered question, options A–D, then Answer: letter
+
+1. Which DAX function returns the number of rows in a table?
+A) SUMX
+B) DISTINCT
+C) COUNTROWS
+D) LOOKUPVALUE
+Answer: C
+
+2. What is a 'spike' in Agile?
+A) A time-boxed investigation to reduce uncertainty
+B) A sudden increase in bugs
+C) A meeting with senior management
+D) A release to production
+Answer: A
+
+3. What is the focus of the Sprint Review?
+A) Review the team's behaviour and mood
+B) Inspect the Increment with stakeholders and adapt the Product Backlog
+C) Assign bonuses to developers
+D) Plan the next release date only
+Answer: B
+
+4. Which chart type is used to display geographic data in Tableau?
+A) Bullet chart
+B) Histogram
+C) Gantt chart
+D) Map
+Answer: D
+
+5. Which view in Power BI Desktop is used to manage relationships between tables?
+A) Model view
+B) Report view
+C) Data view
+D) Query view
+Answer: A
+
+6. Which visual is best for displaying a single key number such as Total Sales?
+A) Waterfall chart
+B) Matrix
+C) Ribbon chart
+D) Card
+Answer: D
+
+7. What does the condition salary BETWEEN 10000 AND 20000 select?
+A) Salaries strictly greater than 10000 and less than 20000
+B) Salaries below 10000 or above 20000
+C) Only the salaries equal to 10000 or 20000
+D) Salaries from 10000 to 20000, both included
+Answer: D
+
+8. Which SQL statement modifies existing rows in a table?
+A) ALTER
+B) MODIFY TABLE
+C) SELECT
+D) UPDATE
+Answer: D
+
+9. What is the maximum timebox for Sprint Planning in a one-month Sprint?
+A) 15 minutes
+B) 2 hours
+C) 8 hours
+D) 3 days
+Answer: C
+
+10. What does 'timeboxing' mean in Agile?
+A) Recording the time each developer logs in
+B) Extending deadlines when work is late
+C) Blocking calendar time for managers
+D) Fixing a maximum duration for an activity
+Answer: D
+
+11. What does DirectQuery mode do?
+A) Queries the data source in real time without importing the data
+B) Copies all data into memory at refresh
+C) Exports data to Excel automatically
+D) Works only with .csv files
+Answer: A
+
+12. Which JOIN returns only the rows that have matching values in both tables?
+A) INNER JOIN
+B) FULL OUTER JOIN
+C) LEFT JOIN
+D) CROSS JOIN
+Answer: A
+
+13. What is a subquery?
+A) A query that runs only on views
+B) A query nested inside another query
+C) A query that never returns rows
+D) A backup command for tables
+Answer: B
+
+14. Which Agile methodology emphasizes pair programming and test-driven development?
+A) PRINCE2
+B) Waterfall
+C) Extreme Programming (XP)
+D) Six Sigma
+Answer: C
+
+15. Which shelf in Tableau is used to place fields that form the rows of a view?
+A) Filters shelf
+B) Rows shelf
+C) Pages shelf
+D) Detail shelf
+Answer: B
+
+16. What is Tableau Reader?
+A) A tool for editing data sources
+B) A cloud database service
+C) A scripting language for Tableau
+D) A free desktop application to view packaged workbooks without editing
+Answer: D
+
+17. Which set of columns is typical on a basic Kanban board?
+A) Plan, Design, Build, Test
+B) Sprint 1, Sprint 2, Sprint 3
+C) To Do, In Progress, Done
+D) Low, Medium, High
+Answer: C
+
+18. What does a Group do in Tableau?
+A) Joins two data sources
+B) Splits a measure into two fields
+C) Combines members of a dimension into higher-level categories
+D) Filters data using a formula
+Answer: C
+
+19. Which function returns the highest value in a column?
+A) MAX()
+B) TOP()
+C) HIGH()
+D) LARGEST()
+Answer: A
+
+20. What is an Epic in Agile?
+A) A large body of work that can be broken into smaller user stories
+B) A meeting held at the end of a Sprint
+C) A defect found in production
+D) A tool for tracking hours
+Answer: A
+
+21. What is a Bookmark used for in Power BI?
+A) Saving a data source password
+B) Capturing a report's current state such as filters and visibility
+C) Marking a column as a primary key
+D) Scheduling a data refresh
+Answer: B
+
+22. Which DAX function fetches a column value from a related table on the 'one' side?
+A) RELATEDTABLE
+B) LOOKUP
+C) FILTER
+D) RELATED
+Answer: D
+
+23. What does SELECT COUNT(DISTINCT city) FROM customers return?
+A) The number of unique cities
+B) The total number of customer rows
+C) The city with the most customers
+D) A list of all cities
+Answer: A
+
+24. What does 'Append Queries' do in Power Query?
+A) Joins tables side by side using a key
+B) Stacks the rows of one table below another
+C) Deletes duplicate columns
+D) Pivots rows into columns
+Answer: B
+
+25. What does a Union do in Tableau's data source page?
+A) Joins tables side by side using a key
+B) Removes duplicate columns
+C) Creates a parameter from a table
+D) Appends rows from tables that have the same structure
+Answer: D
+
+26. What is a Tableau Join?
+A) Merging two dashboards into one
+B) Copying a worksheet
+C) Exporting data to CSV
+D) Combining tables from the same data source using common columns
+Answer: D
+
+27. Why is the DAX function DIVIDE often preferred over the '/' operator?
+A) It handles divide-by-zero safely
+B) It rounds results to integers
+C) It works only on text columns
+D) It runs faster only on dates
+Answer: A
+
+28. What is the main purpose of an index on a table column?
+A) To speed up data retrieval
+B) To encrypt the column data
+C) To prevent duplicate tables
+D) To reduce the number of columns
+Answer: A
+
+29. In Power BI Service, what is a dashboard?
+A) A file that stores raw data
+B) A single-page canvas of tiles pinned from reports
+C) A Power Query script
+D) A multi-page report with slicers only
+Answer: B
+
+30. In the INVEST criteria for good user stories, what does 'I' stand for?
+A) Independent
+B) Immediate
+C) Incremental
+D) Integrated
+Answer: A
+
+31. According to the Scrum Guide, how large should a Scrum Team typically be?
+A) Exactly 3 people
+B) 20 to 30 people
+C) 10 or fewer people
+D) At least 15 people
+Answer: C
+
+32. What does the Drillthrough feature allow?
+A) Deleting a visual from all pages
+B) Changing the data source type
+C) Converting a measure into a column
+D) Navigating to a detail page filtered by the selected item
+Answer: D
+
+33. Which is a characteristic of the Waterfall model when compared with Agile?
+A) Short iterations with continuous feedback
+B) Sequential phases with little room for change once a phase is complete
+C) Requirements evolve every Sprint
+D) Working software is delivered every week
+Answer: B
+
+34. Which constraint ensures that a column cannot contain NULL values?
+A) UNIQUE
+B) NOT NULL
+C) CHECK
+D) DEFAULT
+Answer: B
+
+35. Which pane in Tableau provides trend lines, reference lines and forecasts?
+A) Data pane
+B) Pages pane
+C) Analytics pane
+D) Layout pane
+Answer: C
+
+36. What is Product Backlog refinement?
+A) Ongoing activity of clarifying and breaking down backlog items
+B) Deleting the backlog after each Sprint
+C) Estimating the project budget
+D) Running the final acceptance test
+Answer: A
+
+37. What is a VIEW in SQL?
+A) A physical copy of a table on disk
+B) A virtual table based on the result of a query
+C) A backup of the whole database
+D) A type of index
+Answer: B
+
+38. Which operator is used to check whether a value is NULL?
+A) = NULL
+B) == NULL
+C) IS NULL
+D) EQUALS NULL
+Answer: C
+
+39. Which Power BI feature lets users ask questions in natural language and get visuals?
+A) Analyze in Excel
+B) Power Apps
+C) Quick Measure
+D) Q&A
+Answer: D
+
+40. What is a dual-axis chart in Tableau?
+A) A chart with two dashboards
+B) A chart connected to two servers
+C) A chart that overlays two measures on separate axes in one view
+D) A chart that shows only two rows
+Answer: C
+
+41. What does MVP stand for in Agile product development?
+A) Maximum Value Process
+B) Minimum Viable Product
+C) Minimum Verified Prototype
+D) Managed Version Plan
+Answer: B
+
+42. Which Tableau product is used to publish and share workbooks within an organisation?
+A) Tableau Reader only
+B) Tableau Mobile Designer
+C) Tableau Server / Tableau Cloud
+D) Tableau Prep Builder
+Answer: C
+
+43. What is a Power BI Dataflow?
+A) A type of chart animation
+B) A gateway installed on a local server
+C) Reusable data preparation logic built with Power Query Online
+D) A row-level security rule
+Answer: C
+
+44. What does the 'Show Me' feature do?
+A) Displays the workbook's file size
+B) Shows all users who opened the workbook
+C) Suggests suitable chart types based on the selected fields
+D) Publishes the view to Tableau Public
+Answer: C
+
+45. Which DAX time-intelligence function calculates a year-to-date total?
+A) TOTALYTD
+B) DATEDIFF
+C) SAMEPERIODLASTYEAR
+D) EOMONTH
+Answer: A
+
+46. What does the Marks card control in Tableau?
+A) Database connection settings
+B) Visual properties such as colour, size, label and detail
+C) User login permissions
+D) Workbook file location
+Answer: B
+
+47. Which command permanently saves the changes made in a transaction?
+A) ROLLBACK
+B) COMMIT
+C) SAVEPOINT
+D) REVOKE
+Answer: B
+
+48. In Scrum, which artifact has the Sprint Goal as its commitment?
+A) Product Backlog
+B) Increment
+C) Burndown Chart
+D) Sprint Backlog
+Answer: D
+
+49. What is a Set in Tableau?
+A) A custom field that defines a subset of data based on conditions
+B) A group of dashboards
+C) A type of data source file
+D) A saved colour palette
+Answer: A
+
+50. Which SQL statement is used to add new rows to a table?
+A) ADD ROW
+B) INSERT INTO
+C) APPEND TO
+D) UPDATE SET
+Answer: B

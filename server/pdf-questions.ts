@@ -1,7 +1,12 @@
 import path from "path";
 import fs from "fs";
 import mammoth from "mammoth";
-import { htmlToStructuredText, parseMcqBlock } from "./mcq-question-parse";
+import {
+  htmlToStructuredText,
+  normalizeMcqLineBreaks,
+  parseMcqBlock,
+  sanitizeQuestionStemForMcq,
+} from "./mcq-question-parse";
 
 export type ParsedQuestion = {
   text: string;
@@ -79,14 +84,18 @@ function splitQuestionAndAnswer(block: string): ParsedQuestion {
     cleanedBlock = block.replace(imgMatch[0], "").trim();
   }
 
-  const mcq = parseMcqBlock(cleanedBlock);
+  const normalizedBlock = normalizeMcqLineBreaks(cleanedBlock);
+  let mcq = parseMcqBlock(normalizedBlock);
+  if (mcq.options.length < 2 && normalizedBlock !== cleanedBlock) {
+    mcq = parseMcqBlock(cleanedBlock);
+  }
   if (mcq.options.length >= 2) {
-    const text = (mcq.questionText || cleanedBlock).replace(/\s+/g, " ").trim();
+    const text = sanitizeQuestionStemForMcq(mcq.questionText || "", mcq.options);
     return {
-      text,
+      text: text || sanitizeQuestionStemForMcq(cleanedBlock, mcq.options),
       options: mcq.options,
       correctOption: mcq.correctOption,
-      modelAnswer: mcq.modelAnswer ?? null,
+      modelAnswer: null,
       imageUrl,
     };
   }

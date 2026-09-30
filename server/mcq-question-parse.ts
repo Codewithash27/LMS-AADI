@@ -78,6 +78,46 @@ function splitInlineOptions(line: string): { parts: string[]; marked: number[] }
   return { parts, marked };
 }
 
+/** PDF/Word often flatten MCQ onto one line — restore breaks before A) / Answer:. */
+export function normalizeMcqLineBreaks(block: string): string {
+  let t = (block || "").replace(/\r\n/g, "\n");
+  t = t.replace(/([^\n])\s+(?=[A-F]\)\s)/gi, "$1\n");
+  t = t.replace(/([^\n])\s+(?=Option\s+\d+\s*[.):\-])/gi, "$1\n");
+  t = t.replace(
+    /([^\n])\s+(?=(?:(?:correct|right|model)\s+)?(?:answer|ans|solution)\s*(?:key)?\s*[:\-–\.])/gi,
+    "$1\n"
+  );
+  return t;
+}
+
+/** Remove options / answer key from stem shown to students. */
+export function sanitizeQuestionStemForMcq(text: string, options?: string[] | null): string {
+  let t = (text || "").replace(/\r\n/g, "\n").trim();
+  if (!t) return "";
+
+  t = t.replace(
+    /\n?\s*(?:(?:correct|right|model)\s+)?(?:answer|ans|solution)\s*(?:key)?\s*[:\-–\.]\s*[^\n]*/gi,
+    ""
+  );
+  t = t.replace(/^\s*[A-F]\)\s*.+$/gim, "");
+  t = t.replace(/^\s*Option\s+\d+\s*[.):\-]\s*.+$/gim, "");
+
+  if ((t.match(/[A-F]\)/gi) || []).length >= 2) {
+    t = t.replace(/\s+[A-F]\)\s+.+$/gi, "");
+  }
+
+  if (options?.length) {
+    for (const opt of options) {
+      const trimmed = opt.trim();
+      if (trimmed.length < 3) continue;
+      const esc = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      t = t.replace(new RegExp(`\\s*${esc}\\s*`, "gi"), " ");
+    }
+  }
+
+  return t.replace(/\s+/g, " ").trim();
+}
+
 function extractAnswerLine(body: string): { answer?: string; rest: string } {
   const lines = body.split("\n");
   for (let i = lines.length - 1; i >= 0; i--) {

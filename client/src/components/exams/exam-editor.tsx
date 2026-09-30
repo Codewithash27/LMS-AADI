@@ -31,6 +31,7 @@ import {
   validateMcqQuestionClient,
   normalizeMcqOptions,
   inferMcqCorrectOption,
+  sanitizeMcqQuestionStem,
 } from "@/lib/exam-mcq";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -90,13 +91,14 @@ function buildQuestionsFromPool(
 ): QuestionType[] {
   const picked = shufflePick(pool, count);
   return picked.map((q, index) => {
+    const opts = q.options?.slice(0, 6);
     const base: QuestionType = {
       id: index + 1,
-      text: q.text,
+      text: isMcq ? sanitizeMcqQuestionStem(q.text, opts) : q.text,
       order: index,
-      modelAnswer: q.modelAnswer ?? null,
+      modelAnswer: isMcq ? null : q.modelAnswer ?? null,
       imageUrl: q.imageUrl ?? null,
-      options: q.options?.slice(0, 6),
+      options: opts,
       correctOption: q.correctOption ?? null,
     };
     return isMcq ? ensureMcqOptions(base) : base;
@@ -462,6 +464,7 @@ export default function ExamEditor({
               );
               options = normalized.options;
               correctOption = normalized.correctOption;
+              text = sanitizeMcqQuestionStem(text, options);
             } else if (question.options && question.options.length >= 2) {
               const lines = question.options
                 .map((opt, i) => `${OPTION_LETTERS[i]}) ${opt.trim()}`)
@@ -473,7 +476,7 @@ export default function ExamEditor({
               text,
               order: index,
               examId,
-              modelAnswer,
+              modelAnswer: data.examType === "mcq" ? null : modelAnswer,
               imageUrl: question.imageUrl || null,
               options,
               correctOption,

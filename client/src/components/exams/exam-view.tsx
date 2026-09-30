@@ -2,11 +2,22 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { BookOpen, Clock, LogOut, AlertTriangle, Check, Award } from "lucide-react";
+import {
+  BookOpen,
+  Clock,
+  LogOut,
+  AlertTriangle,
+  Check,
+  Award,
+  X,
+  Target,
+} from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import {
   normalizeExamType,
   mcqEncouragement,
   OPTION_LETTERS,
+  sanitizeMcqQuestionStem,
 } from "@/lib/exam-mcq";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -35,6 +46,7 @@ type SubmitScoreSummary = {
   maxScore: number;
   percent: number;
   feedback: string;
+  questionResults?: Record<number, boolean>;
 };
 
 type ExamViewProps = {
@@ -117,6 +129,51 @@ function normalizeQuestionOptions(q: { options?: unknown }): string[] {
   return q.options.map((o) => String(o ?? "").trim()).filter(Boolean);
 }
 
+function displayQuestionStem(q: ExamQuestion | undefined, isMcq: boolean): string {
+  if (!q) return "";
+  const base = getCleanQuestionText(q.text);
+  return isMcq ? sanitizeMcqQuestionStem(base, q.options ?? []) : base;
+}
+
+function scoreTone(percent: number): "good" | "mid" | "low" {
+  if (percent >= 80) return "good";
+  if (percent >= 60) return "mid";
+  return "low";
+}
+
+function McqScoreRing({ percent, size = 120 }: { percent: number; size?: number }) {
+  const r = 42;
+  const c = 2 * Math.PI * r;
+  const offset = c * (1 - Math.min(100, Math.max(0, percent)) / 100);
+  const tone = scoreTone(percent);
+  const stroke =
+    tone === "good" ? "#22c55e" : tone === "mid" ? "#f59e0b" : "#ef4444";
+
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r={r} fill="none" stroke="#e8e0d5" strokeWidth="9" />
+        <circle
+          cx="50"
+          cy="50"
+          r={r}
+          fill="none"
+          stroke={stroke}
+          strokeWidth="9"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-2xl font-bold tabular-nums leading-none text-gray-900">
+          {percent}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function ExamView({
   open = true,
   onOpenChange,
@@ -145,6 +202,7 @@ export default function ExamView({
   const isMcqExam = normalizeExamType(exam?.examType) === "mcq";
 
   const answersRef = useRef(answers);
+  const questionsRef = useRef(questions);
   const examAttemptIdRef = useRef(examAttemptId);
   const isSubmittingRef = useRef(isSubmitting);
   const submittedRef = useRef(submitted);
@@ -152,6 +210,9 @@ export default function ExamView({
   useEffect(() => {
     answersRef.current = answers;
   }, [answers]);
+  useEffect(() => {
+    questionsRef.current = questions;
+  }, [questions]);
   useEffect(() => {
     examAttemptIdRef.current = examAttemptId;
   }, [examAttemptId]);
@@ -281,11 +342,13 @@ export default function ExamView({
           data.score != null;
         if (mcq) {
           const percent = Math.round((Number(data.score) / Number(data.maxScore)) * 100);
+          const qr = data.questionResults as Record<number, boolean> | undefined;
           setSubmitScore({
             score: Number(data.score),
             maxScore: Number(data.maxScore),
             percent,
             feedback: String(data.feedback || ""),
+            questionResults: qr,
           });
           toast({
             title:
@@ -497,33 +560,111 @@ export default function ExamView({
   }
 
   if (submitted && submitScore) {
+    const reviewQuestions = questionsRef.current;
+    const tone = scoreTone(submitScore.percent);
     return (
-      <div className="flex h-[100dvh] select-none flex-col items-center justify-center bg-[#1a3a4a] p-6">
-        <div className="w-full max-w-md rounded-2xl border border-white/20 bg-white p-8 text-center shadow-xl">
-          <Award className="mx-auto mb-3 h-12 w-12 text-amber-500" />
-          <h2 className="text-xl font-bold text-gray-900">Exam submitted</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{exam?.title}</p>
-          <p className="mt-6 text-4xl font-bold tabular-nums text-primary">
-            {submitScore.percent}%
+      <div className="flex h-[100dvh] select-none flex-col overflow-hidden bg-gradient-to-br from-[#1a3a4a] via-[#0f766e]/90 to-[#1e3a5f]">
+        <header className="shrink-0 px-4 py-3 text-center text-white">
+          <p className="text-xs font-medium uppercase tracking-wider text-white/70">
+            MCQ exam complete
           </p>
-          <p className="mt-2 text-sm text-gray-700">
-            {submitScore.score} / {submitScore.maxScore} correct
-          </p>
-          <p className="mt-3 text-sm font-medium text-emerald-700">
-            {mcqEncouragement(submitScore.percent)}
-          </p>
-          {submitScore.feedback ? (
-            <p className="mt-4 rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
-              {submitScore.feedback}
-            </p>
-          ) : null}
+          <h1 className="mt-1 truncate text-lg font-bold">{exam?.title}</h1>
+        </header>
+
+        <main className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col gap-4 overflow-hidden px-4 pb-6">
+          <div className="shrink-0 rounded-2xl border border-white/20 bg-white/95 p-6 shadow-xl backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-4">
+                <McqScoreRing percent={submitScore.percent} />
+                <div className="text-left">
+                  <div className="flex items-center gap-2">
+                    <Award
+                      className={cn(
+                        "h-5 w-5",
+                        tone === "good"
+                          ? "text-emerald-600"
+                          : tone === "mid"
+                            ? "text-amber-600"
+                            : "text-red-500"
+                      )}
+                    />
+                    <span className="text-sm font-semibold text-gray-800">
+                      {mcqEncouragement(submitScore.percent)}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-gray-900">
+                    {submitScore.score}
+                    <span className="text-lg font-medium text-muted-foreground">
+                      {" "}
+                      / {submitScore.maxScore}
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">questions correct</p>
+                </div>
+              </div>
+              <div className="w-full sm:max-w-[180px]">
+                <Progress value={submitScore.percent} className="h-2.5" />
+                <p className="mt-2 text-center text-xs text-muted-foreground">
+                  {submitScore.percent}% overall
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/20 bg-white/95 shadow-xl">
+            <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
+              <Target className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-bold text-gray-900">Question review</h2>
+            </div>
+            <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
+              {reviewQuestions.map((q, idx) => {
+                const ok =
+                  submitScore.questionResults?.[q.id] ??
+                  submitScore.questionResults?.[String(q.id) as unknown as number];
+                const answered = (answersRef.current[q.id] || "").trim();
+                return (
+                  <li
+                    key={q.id}
+                    className={cn(
+                      "rounded-xl border p-3 text-sm",
+                      ok === true && "border-emerald-200 bg-emerald-50/80",
+                      ok === false && "border-red-200 bg-red-50/80",
+                      ok === undefined && "border-border bg-muted/30"
+                    )}
+                  >
+                    <div className="flex items-start gap-2">
+                      {ok === true ? (
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                      ) : ok === false ? (
+                        <X className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+                      ) : (
+                        <span className="mt-0.5 h-4 w-4 shrink-0 rounded-full bg-muted" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium leading-snug text-gray-900">
+                          Q{idx + 1}. {displayQuestionStem(q, true)}
+                        </p>
+                        <p className="mt-1.5 text-xs text-muted-foreground">
+                          Your answer:{" "}
+                          <span className="font-medium text-gray-800">
+                            {answered || "Not answered"}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
           <Button
-            className="mt-8 w-full rounded-xl bg-accent-brand text-white hover:opacity-90"
+            className="h-12 shrink-0 rounded-xl bg-accent-brand text-base font-semibold text-white shadow-lg hover:opacity-90"
             onClick={closeExam}
           >
             Back to exams
           </Button>
-        </div>
+        </main>
       </div>
     );
   }
@@ -654,7 +795,7 @@ export default function ExamView({
           </div>
 
           <h2 className="max-w-3xl text-lg font-bold leading-snug text-gray-900 sm:text-xl lg:text-2xl">
-            {getCleanQuestionText(currentQuestion?.text || "")}
+            {displayQuestionStem(currentQuestion, isMcqExam)}
           </h2>
 
           {getQuestionImageUrl(currentQuestion) && (

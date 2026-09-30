@@ -1,4 +1,5 @@
 import type { Question, ExamType } from "@shared/schema";
+import { sanitizeQuestionStemForMcq } from "./mcq-question-parse";
 
 type McqQuestion = Question & {
   options?: string[] | null;
@@ -10,8 +11,12 @@ export function normalizeExamType(value: unknown): ExamType {
 }
 
 /** Hide grading keys from students; keep options so they can answer MCQs. */
-export function stripQuestionForStudent(q: Question | McqQuestion) {
+export function stripQuestionForStudent(q: Question | McqQuestion, examType?: ExamType) {
   const { modelAnswer, correctOption, ...rest } = q as McqQuestion;
+  const opts = Array.isArray(rest.options) ? (rest.options as string[]) : null;
+  if (examType === "mcq" || (opts && opts.length >= 2)) {
+    rest.text = sanitizeQuestionStemForMcq(String(rest.text ?? ""), opts);
+  }
   return rest;
 }
 
