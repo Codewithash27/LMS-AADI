@@ -203,6 +203,7 @@ export default function ExamView({
 
   const answersRef = useRef(answers);
   const questionsRef = useRef(questions);
+  const jumpButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const examAttemptIdRef = useRef(examAttemptId);
   const isSubmittingRef = useRef(isSubmitting);
   const submittedRef = useRef(submitted);
@@ -213,6 +214,13 @@ export default function ExamView({
   useEffect(() => {
     questionsRef.current = questions;
   }, [questions]);
+
+  useEffect(() => {
+    jumpButtonRefs.current[currentQuestionIndex]?.scrollIntoView({
+      block: "nearest",
+      behavior: "smooth",
+    });
+  }, [currentQuestionIndex]);
   useEffect(() => {
     examAttemptIdRef.current = examAttemptId;
   }, [examAttemptId]);
@@ -672,11 +680,11 @@ export default function ExamView({
   const arena = (
     <div className="grid h-full w-full grid-cols-1 overflow-hidden rounded-2xl border border-white/40 shadow-xl md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr]">
       {/* Left: MCQ-style gradient panel + circular timer */}
-      <aside className="relative flex flex-col gap-4 overflow-hidden bg-gradient-to-br from-primary via-[#14B8A6] to-brand-blue px-4 py-4 text-white md:gap-6 md:py-6">
+      <aside className="relative flex min-h-0 flex-col gap-4 overflow-hidden bg-gradient-to-br from-primary via-[#14B8A6] to-brand-blue px-4 py-4 text-white md:gap-4 md:py-6">
         <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
         <div className="pointer-events-none absolute bottom-0 left-0 h-32 w-32 rounded-full bg-black/10 blur-2xl" />
 
-        <div className="relative z-10">
+        <div className="relative z-10 shrink-0">
           <p className="truncate text-[11px] font-medium text-white/80">
             {exam?.title || (isMcqExam ? "MCQ Exam" : "Written Exam")}
           </p>
@@ -689,7 +697,7 @@ export default function ExamView({
           </p>
         </div>
 
-        <div className="relative z-10 flex items-center gap-4 md:flex-col md:items-stretch">
+        <div className="relative z-10 flex shrink-0 items-center gap-4 md:flex-col md:items-stretch">
           <div className="relative mx-auto h-[108px] w-[108px] shrink-0">
             <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
               <circle
@@ -754,34 +762,46 @@ export default function ExamView({
           </div>
         </div>
 
-        <div className="relative z-10 mt-auto">
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-white/70">
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden">
+          <p className="mb-2 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-white/70">
             Jump to
           </p>
-          <div className="flex flex-wrap gap-1.5">
-            {questions.map((q, idx) => {
-              const answered = (answers[q.id] || "").trim() !== "";
-              const active = idx === currentQuestionIndex;
-              return (
-                <button
-                  key={q.id}
-                  type="button"
-                  onClick={() => setCurrentQuestionIndex(idx)}
-                  className={cn(
-                    "h-8 w-8 rounded-lg text-xs font-bold transition-all",
-                    active && "scale-105 bg-white text-primary shadow-md",
-                    !active &&
-                      answered &&
-                      "bg-white/25 text-white ring-1 ring-white/40",
-                    !active &&
-                      !answered &&
-                      "bg-black/15 text-white/80 hover:bg-white/20"
-                  )}
-                >
-                  {idx + 1}
-                </button>
-              );
-            })}
+          <p className="mb-2 shrink-0 text-[10px] text-white/55">
+            Scroll the list · tap a number to open that question
+          </p>
+          <div
+            className="min-h-[120px] flex-1 overflow-y-auto overflow-x-hidden overscroll-contain rounded-xl border border-white/10 bg-black/10 p-2 [-webkit-overflow-scrolling:touch] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.45)_transparent]"
+            aria-label="Question navigation"
+          >
+            <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-6">
+              {questions.map((q, idx) => {
+                const answered = (answers[q.id] || "").trim() !== "";
+                const active = idx === currentQuestionIndex;
+                return (
+                  <button
+                    key={q.id}
+                    ref={(el) => {
+                      jumpButtonRefs.current[idx] = el;
+                    }}
+                    type="button"
+                    title={`Question ${idx + 1}${answered ? " (answered)" : ""}`}
+                    onClick={() => setCurrentQuestionIndex(idx)}
+                    className={cn(
+                      "h-8 w-full min-w-0 rounded-lg text-xs font-bold transition-all",
+                      active && "scale-105 bg-white text-primary shadow-md ring-2 ring-white/80",
+                      !active &&
+                        answered &&
+                        "bg-white/25 text-white ring-1 ring-white/40",
+                      !active &&
+                        !answered &&
+                        "bg-black/15 text-white/80 hover:bg-white/20"
+                    )}
+                  >
+                    {idx + 1}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </aside>

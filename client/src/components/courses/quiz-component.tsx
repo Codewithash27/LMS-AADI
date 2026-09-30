@@ -272,7 +272,7 @@ export default function QuizComponent({
           className={cn(
             "relative overflow-hidden text-white",
             "bg-gradient-to-br from-primary via-[#14B8A6] to-brand-blue",
-            "px-4 py-4 md:py-6 flex flex-col gap-4 md:gap-6"
+            "px-4 py-4 md:py-6 flex min-h-0 flex-col gap-4 md:gap-4"
           )}
         >
           <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-white/10 blur-2xl pointer-events-none" />
@@ -342,34 +342,43 @@ export default function QuizComponent({
           )}
 
           {/* Question jump on side panel (desktop) / wrap under timer (mobile) */}
-          <div className="relative z-10 mt-auto">
-            <p className="text-[10px] uppercase tracking-wider text-white/70 mb-2 font-semibold">
+          <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden">
+            <p className="mb-2 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-white/70">
               Jump to
             </p>
-            <div className="flex flex-wrap gap-1.5">
-              {questions.map((_, idx) => {
-                const answered = selectedOptions[idx] !== -1;
-                const active = idx === currentQuestionIndex;
-                return (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      setCurrentQuestionIndex(idx);
-                      questionIndexRef.current = idx;
-                      emitProgress();
-                    }}
-                    className={cn(
-                      "h-8 w-8 rounded-lg text-xs font-bold transition-all",
-                      active && "bg-white text-primary shadow-md scale-105",
-                      !active && answered && "bg-white/25 text-white ring-1 ring-white/40",
-                      !active && !answered && "bg-black/15 text-white/80 hover:bg-white/20"
-                    )}
-                  >
-                    {idx + 1}
-                  </button>
-                );
-              })}
+            <p className="mb-2 shrink-0 text-[10px] text-white/55">
+              Scroll · tap a number to jump
+            </p>
+            <div
+              className="min-h-[120px] flex-1 overflow-y-auto overflow-x-hidden overscroll-contain rounded-xl border border-white/10 bg-black/10 p-2 [-webkit-overflow-scrolling:touch] [scrollbar-width:thin]"
+              aria-label="Question navigation"
+            >
+              <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-6">
+                {questions.map((_, idx) => {
+                  const answered = selectedOptions[idx] !== -1;
+                  const active = idx === currentQuestionIndex;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      title={`Question ${idx + 1}`}
+                      onClick={() => {
+                        setCurrentQuestionIndex(idx);
+                        questionIndexRef.current = idx;
+                        emitProgress();
+                      }}
+                      className={cn(
+                        "h-8 w-full min-w-0 rounded-lg text-xs font-bold transition-all",
+                        active && "scale-105 bg-white text-primary shadow-md ring-2 ring-white/80",
+                        !active && answered && "bg-white/25 text-white ring-1 ring-white/40",
+                        !active && !answered && "bg-black/15 text-white/80 hover:bg-white/20"
+                      )}
+                    >
+                      {idx + 1}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </aside>
