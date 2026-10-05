@@ -77,15 +77,15 @@ export default function MainLayout({ children }: MainLayoutProps) {
         onToggleCollapse={toggleCollapsed}
       />
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-app-main transition-[width,margin] duration-300 ease-out">
-        <header className="sticky top-0 z-30 shrink-0 border-b border-border bg-card">
-          <div className="flex h-11 items-center justify-between gap-3 px-3 sm:px-4 md:px-5">
+      <div className="main-content-premium flex min-h-0 min-w-0 flex-1 flex-col transition-[width,margin] duration-300 ease-out">
+        <header className="glass-appbar sticky top-0 z-30 shrink-0 border-b border-border/70 shadow-sm">
+          <div className="flex h-12 items-center justify-between gap-3 px-3 sm:px-4 md:px-5">
             <div className="flex min-w-0 items-center gap-2">
               {isMobile && (
                 <button
                   type="button"
                   onClick={() => setMobileOpen(true)}
-                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                   aria-label="Open menu"
                 >
                   <Menu className="h-5 w-5" />
@@ -105,7 +105,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                   {greeting.text}, <span className="font-semibold text-foreground">{firstName}</span>
                 </p>
 
-                <div className="hidden items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-muted-foreground sm:flex">
+                <div className="hidden items-center gap-1.5 rounded-full border border-border/80 bg-background/80 px-2.5 py-1.5 text-muted-foreground shadow-sm backdrop-blur-sm transition-shadow focus-within:shadow-md sm:flex">
                   <Search className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
                   <input
                     value={searchQuery}

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   BarChart3,
   BookOpen,
@@ -296,80 +297,75 @@ export default function Sidebar({
     </>
   );
 
-  const itemClass = (active: boolean, _color: string) =>
+  const itemClass = (active: boolean) =>
     cn(
-      "group relative flex w-full items-center gap-3 rounded-2xl mx-1 my-0.5 text-left transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:translate-x-0.5",
+      "group relative flex w-full items-center gap-3 rounded-2xl mx-1.5 my-0.5 text-left transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
       collapsed ? "justify-center px-1 py-2.5" : "px-3 py-2.5",
-      active ? "font-semibold" : "font-medium"
+      active ? "sidebar-nav-active font-semibold text-primary" : "font-medium text-muted-foreground hover:bg-white/50 hover:text-foreground hover:shadow-sm"
     );
-
-  const itemStyle = (active: boolean, _color: string): CSSProperties => ({
-    backgroundColor: active
-      ? "color-mix(in srgb, var(--color-primary-main) 12%, transparent)"
-      : "transparent",
-    color: active ? themeColor.primary : themeColor.textMuted,
-    borderLeft: active ? `6px solid ${themeColor.primary}` : "6px solid transparent",
-  });
 
   const navContent = (
     <div
-      className="flex h-full flex-col overflow-hidden border-r shadow-[4px_0_24px_rgba(0,0,0,0.04)] bg-sidebar-warm"
-      style={{ borderColor: themeColor.border, color: themeColor.text }}
+      className="bg-sidebar-premium relative z-0 flex h-full flex-col overflow-hidden border-r border-border/60 shadow-[8px_0_32px_rgba(15,23,42,0.06)]"
+      style={{ color: themeColor.text }}
     >
-      <div
-        className="mb-2 flex items-center justify-between px-4 py-5 text-white shadow-[0_8px_20px_rgba(15,23,42,0.18)]"
-        style={{
-          background: `linear-gradient(135deg, ${themeColor.primary} 0%, ${themeColor.accent} 100%)`,
-          borderRadius: "0 0 40px 40px",
-        }}
-      >
-        {!collapsed && (
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-white p-1.5 shadow-md">
-              <BookOpen className="h-5 w-5 text-primary" />
+      <div className="relative z-10 mb-1">
+        <div className="sidebar-brand-gradient relative flex items-center justify-between overflow-hidden px-4 py-5 text-white shadow-[0_10px_28px_rgba(15,23,42,0.22)] rounded-b-[2rem]">
+          <div
+            className="pointer-events-none absolute inset-0 opacity-30"
+            style={{
+              background:
+                "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.35), transparent 45%)",
+            }}
+          />
+          {!collapsed && (
+            <div className="relative flex min-w-0 items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/95 p-2 shadow-lg ring-2 ring-white/30 transition-transform duration-300 group-hover:scale-105">
+                <BookOpen className="h-5 w-5 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-[15px] font-bold leading-snug tracking-tight text-white drop-shadow-sm">
+                  Edu Transform
+                </p>
+                <p className="truncate text-[11px] font-medium tracking-wide text-white/80">
+                  Learning Platform
+                </p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-[15px] font-semibold leading-snug tracking-tight text-white">
-                Edu Transform
-              </p>
-              <p className="truncate text-[11px] font-medium tracking-wide text-white/75">
-                Learning Platform
-              </p>
-            </div>
-          </div>
-        )}
-        <div className={cn("flex items-center gap-1", collapsed && "mx-auto")}>
-          {isMobile ? (
-            <button
-              type="button"
-              onClick={onMobileClose}
-              className="rounded-full bg-white/20 p-2 text-white hover:bg-white/30"
-              aria-label="Close sidebar"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onToggleCollapse}
-              className="rounded-full bg-white/20 p-2 text-white shadow-sm hover:bg-white/30"
-              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            >
-              {collapsed ? (
-                <Menu className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4 rotate-180" />
-              )}
-            </button>
           )}
+          <div className={cn("relative flex items-center gap-1", collapsed && "mx-auto")}>
+            {isMobile ? (
+              <button
+                type="button"
+                onClick={onMobileClose}
+                className="rounded-xl bg-white/20 p-2 text-white backdrop-blur-sm transition-all hover:scale-105 hover:bg-white/30"
+                aria-label="Close sidebar"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                className="rounded-xl bg-white/20 p-2 text-white shadow-sm backdrop-blur-sm transition-all hover:scale-105 hover:bg-white/30"
+                aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              >
+                {collapsed ? (
+                  <Menu className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 rotate-180" />
+                )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {!collapsed && (
-        <div className="px-4 pb-3">
+        <div className="relative z-10 px-4 pb-3">
           <div
-            className="flex items-center gap-2 rounded-[15px] border bg-white/80 px-3 py-1.5 transition-all focus-within:bg-white focus-within:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary-main)_12%,transparent)]"
-            style={{ borderColor: "color-mix(in srgb, var(--color-primary-main) 20%, transparent)" }}
+            className="sidebar-glass-input flex items-center gap-2 rounded-2xl border px-3 py-2 transition-all duration-300 focus-within:border-primary/30 focus-within:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary-main)_14%,transparent)]"
+            style={{ borderColor: "color-mix(in srgb, var(--color-primary-main) 18%, transparent)" }}
           >
             <Search
               className="h-4 w-4 shrink-0"
@@ -386,7 +382,7 @@ export default function Sidebar({
         </div>
       )}
 
-      <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-1 py-1">
+      <nav className="relative z-10 min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-1 py-2 scrollbar-thin">
         <TooltipProvider delayDuration={0}>
           {filteredItems.map((item) => {
             const hasChildren = !!item.children?.length;
@@ -400,18 +396,12 @@ export default function Sidebar({
             const row =
               item.href && !hasChildren ? (
                 <Link href={item.href} onClick={handleNavigate}>
-                  <div
-                    className={itemClass(isActive, item.color)}
-                    style={itemStyle(isActive, item.color)}
-                  >
-                    {rowContent}
-                  </div>
+                  <div className={itemClass(isActive)}>{rowContent}</div>
                 </Link>
               ) : (
                 <button
                   type="button"
-                  className={itemClass(isActive, item.color)}
-                  style={itemStyle(isActive, item.color)}
+                  className={itemClass(isActive)}
                   onClick={() => {
                     if (hasChildren) {
                       if (collapsed) onToggleCollapse?.();
@@ -436,27 +426,45 @@ export default function Sidebar({
                   row
                 )}
 
-                {hasChildren && isExpanded && !collapsed && (
-                  <div className="pb-1">
-                    {item.children!.map((child) => {
-                      const childIsActive = pathMatches(location, child.href);
-                      return (
-                        <Link key={child.id} href={child.href} onClick={handleNavigate}>
-                          <div
-                            className={cn(
-                              "mx-4 ml-14 my-0.5 cursor-pointer rounded-xl px-3 py-2 text-[13px] leading-snug tracking-tight transition-all duration-200",
-                              childIsActive
-                                ? "bg-primary/10 font-semibold text-primary"
-                                : "font-medium text-muted-foreground hover:bg-primary/5 hover:text-foreground"
-                            )}
-                          >
-                            {child.label}
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
+                <AnimatePresence initial={false}>
+                  {hasChildren && isExpanded && !collapsed && (
+                    <motion.div
+                      key={`sub-${item.id}`}
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+                      className="overflow-hidden"
+                    >
+                      <div className="relative ml-8 border-l border-primary/15 pb-1 pl-3">
+                        {item.children!.map((child, idx) => {
+                          const childIsActive = pathMatches(location, child.href);
+                          return (
+                            <motion.div
+                              key={child.id}
+                              initial={{ x: -6, opacity: 0 }}
+                              animate={{ x: 0, opacity: 1 }}
+                              transition={{ delay: idx * 0.04, duration: 0.22 }}
+                            >
+                              <Link href={child.href} onClick={handleNavigate}>
+                                <div
+                                  className={cn(
+                                    "my-0.5 cursor-pointer rounded-xl px-3 py-2 text-[13px] leading-snug tracking-tight transition-all duration-200",
+                                    childIsActive
+                                      ? "sidebar-nav-active font-semibold text-primary"
+                                      : "font-medium text-muted-foreground hover:translate-x-0.5 hover:bg-white/45 hover:text-foreground"
+                                  )}
+                                >
+                                  {child.label}
+                                </div>
+                              </Link>
+                            </motion.div>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             );
           })}
@@ -465,10 +473,9 @@ export default function Sidebar({
 
       <div
         className={cn(
-          "mx-4 mb-6 mt-auto rounded-[24px] border bg-white shadow-card-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_15px_35px_rgba(0,0,0,0.08)]",
+          "sidebar-profile-card relative z-10 mx-3 mb-5 mt-auto rounded-2xl border border-white/60 shadow-[0_12px_32px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(15,23,42,0.12)]",
           collapsed ? "p-2" : "px-4 py-3"
         )}
-        style={{ borderColor: "color-mix(in srgb, var(--color-text-muted) 10%, transparent)" }}
       >
         <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
           <Avatar
@@ -512,11 +519,15 @@ export default function Sidebar({
     return (
       <>
         {mobileOpen && (
-          <div className="fixed inset-0 z-40 bg-black/40" onClick={onMobileClose} aria-hidden />
+          <div
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] transition-opacity"
+            onClick={onMobileClose}
+            aria-hidden
+          />
         )}
         <aside
           className={cn(
-            "fixed inset-y-0 left-0 z-50 h-screen transition-transform duration-300 ease-out",
+            "fixed inset-y-0 left-0 z-50 h-screen transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
             mobileOpen ? "translate-x-0" : "-translate-x-full"
           )}
           style={{ width: DRAWER_WIDTH }}
@@ -529,7 +540,7 @@ export default function Sidebar({
 
   return (
     <aside
-      className="h-screen shrink-0 transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+      className="h-screen shrink-0 transition-[width,box-shadow] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
       style={{ width: collapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH }}
     >
       {navContent}

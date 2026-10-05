@@ -199,6 +199,88 @@
     backdrop-filter: blur(16px) saturate(160%);
     -webkit-backdrop-filter: blur(16px) saturate(160%);
   }
+
+  .bg-sidebar-premium {
+    position: relative;
+    background: linear-gradient(
+      165deg,
+      hsl(var(--sidebar-background)) 0%,
+      color-mix(in srgb, hsl(var(--sidebar-background)) 88%, white) 45%,
+      color-mix(in srgb, var(--color-bg-default, #f4f8f9) 35%, hsl(var(--sidebar-background))) 100%
+    );
+  }
+
+  .bg-sidebar-premium::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(
+        ellipse 90% 60% at 0% 0%,
+        color-mix(in srgb, var(--color-primary-main, #0f766e) 14%, transparent),
+        transparent 55%
+      ),
+      radial-gradient(
+        ellipse 70% 50% at 100% 100%,
+        color-mix(in srgb, var(--color-brand-blue, #0e7490) 10%, transparent),
+        transparent 50%
+      );
+    pointer-events: none;
+  }
+
+  .sidebar-brand-gradient {
+    background: linear-gradient(
+      125deg,
+      hsl(var(--primary)) 0%,
+      var(--color-brand-blue, #0e7490) 48%,
+      color-mix(in srgb, hsl(var(--primary)) 85%, #1e293b) 100%
+    );
+    background-size: 220% 220%;
+    animation: sidebar-gradient-shift 10s ease-in-out infinite;
+  }
+
+  @keyframes sidebar-gradient-shift {
+    0%,
+    100% {
+      background-position: 0% 40%;
+    }
+    50% {
+      background-position: 100% 60%;
+    }
+  }
+
+  .sidebar-nav-active {
+    background: color-mix(in srgb, var(--color-primary-main) 14%, white);
+    box-shadow:
+      0 4px 18px color-mix(in srgb, var(--color-primary-main) 16%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  }
+
+  .sidebar-glass-input {
+    background: color-mix(in srgb, white 72%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .sidebar-profile-card {
+    background: linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.92) 0%,
+      color-mix(in srgb, white 70%, hsl(var(--sidebar-background))) 100%
+    );
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .main-content-premium {
+    background:
+      radial-gradient(
+        ellipse 80% 50% at 100% 0%,
+        color-mix(in srgb, var(--color-primary-main, #0f766e) 6%, transparent),
+        transparent 50%
+      ),
+      var(--color-bg-default, #f4f8f9);
+  }
 }
 
 /* Custom styles for markdown content in the chat interface */
