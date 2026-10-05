@@ -1226,6 +1226,78 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
     }
   });
 
+  app.post("/api/exams/:examId/allow-retake", isAdmin, async (req, res) => {
+    try {
+      const examId = parseInt(req.params.examId, 10);
+      if (!Number.isFinite(examId)) {
+        return res.status(400).json({ message: "Invalid exam id" });
+      }
+
+      const bodySchema = z
+        .object({
+          userId: z.number().int().positive().optional(),
+          userIds: z.array(z.number().int().positive()).optional(),
+          batchId: z.number().int().positive().optional(),
+        })
+        .refine((b) => b.userId != null || (b.userIds?.length ?? 0) > 0 || b.batchId != null, {
+          message: "Provide userId, userIds, or batchId",
+        });
+
+      const body = bodySchema.parse(req.body);
+      const exam = await storage.getExam(examId);
+      if (!exam || exam.tenantId !== req.user!.tenantId) {
+        return res.status(404).json({ message: "Exam not found" });
+      }
+
+      let targetUserIds: number[] = [];
+      if (body.userId) targetUserIds.push(body.userId);
+      if (body.userIds?.length) targetUserIds.push(...body.userIds);
+
+      if (body.batchId) {
+        const batch = await storage.getBatch(body.batchId);
+        if (!batch || batch.tenantId !== req.user!.tenantId) {
+          return res.status(403).json({ message: "Batch not found or access denied" });
+        }
+        const members = await storage.getBatchEnrollmentsByBatch(body.batchId);
+        const active = members.filter((m) => m.status === "active" || m.status === "completed");
+        targetUserIds.push(...active.map((m) => m.userId));
+      }
+
+      targetUserIds = Array.from(new Set(targetUserIds));
+      const tenantStudents: number[] = [];
+      for (const uid of targetUserIds) {
+        const user = await storage.getUser(uid);
+        if (!user || user.tenantId !== req.user!.tenantId) continue;
+        const role = (user.role || "").toLowerCase();
+        if (role === "admin" || role === "superadmin") continue;
+        tenantStudents.push(uid);
+      }
+
+      if (tenantStudents.length === 0) {
+        return res.status(400).json({ message: "No valid students matched for retake" });
+      }
+
+      const deletedRows = await storage.resetExamAttemptsForUsers(examId, tenantStudents);
+
+      res.json({
+        examId,
+        examTitle: exam.title,
+        studentsAffected: tenantStudents.length,
+        attemptsRemoved: deletedRows,
+        message:
+          deletedRows > 0
+            ? `Retake allowed: cleared ${deletedRows} attempt record(s) for ${tenantStudents.length} student(s).`
+            : `Retake allowed for ${tenantStudents.length} student(s) (no prior attempt on file).`,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Failed to allow exam retake:", error);
+      res.status(500).json({ message: "Failed to allow retake" });
+    }
+  });
+
   // Question routes
   app.get("/api/exams/:examId/questions", isAuthenticated, async (req, res) => {
     try {

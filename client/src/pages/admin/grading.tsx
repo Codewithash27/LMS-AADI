@@ -12,7 +12,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { FileText, User, CheckCircle2, Eye, GraduationCap, Award } from "lucide-react";
+import { FileText, User, CheckCircle2, Eye, GraduationCap, Award, RotateCcw } from "lucide-react";
+import { ExamAllowRetakeDialog } from "@/components/exams/exam-allow-retake-dialog";
 import { useToast } from "@/hooks/use-toast";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import Header from "@/components/layout/header";
@@ -59,6 +60,7 @@ export default function GradingPage() {
   const [isGradingOpen, setIsGradingOpen] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [retakeForAttempt, setRetakeForAttempt] = useState<ExamAttempt | null>(null);
   const { toast } = useToast();
 
   const { data: examAttempts, isLoading } = useQuery({
@@ -228,18 +230,31 @@ export default function GradingPage() {
                 </Badge>
               </TableCell>
               <TableCell className="pr-5 text-right">
-                {attempt.completedAt && (
+                <div className="flex items-center justify-end gap-1">
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="h-9 gap-1.5 px-3 text-primary hover:bg-primary/10"
-                    onClick={() => openGrading(attempt)}
+                    className="h-9 gap-1 px-2 text-teal-700 hover:bg-teal-50"
+                    title="Clear attempt and allow retake"
+                    onClick={() => setRetakeForAttempt(attempt)}
                   >
-                    <Eye className="h-4 w-4" />
-                    {attempt.reviewedAt ? "View" : "Grade"}
+                    <RotateCcw className="h-4 w-4" />
+                    Retake
                   </Button>
-                )}
+                  {attempt.completedAt && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-9 gap-1.5 px-3 text-primary hover:bg-primary/10"
+                      onClick={() => openGrading(attempt)}
+                    >
+                      <Eye className="h-4 w-4" />
+                      {attempt.reviewedAt ? "View" : "Grade"}
+                    </Button>
+                  )}
+                </div>
               </TableCell>
             </TableRow>
           );
@@ -348,6 +363,22 @@ export default function GradingPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ExamAllowRetakeDialog
+        exam={
+          retakeForAttempt
+            ? {
+                id: retakeForAttempt.examId,
+                title: retakeForAttempt.exam.title,
+              }
+            : null
+        }
+        open={!!retakeForAttempt}
+        initialUserId={retakeForAttempt?.userId}
+        onOpenChange={(open) => {
+          if (!open) setRetakeForAttempt(null);
+        }}
+      />
     </DashboardLayout>
   );
 }

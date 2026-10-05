@@ -16,7 +16,7 @@ import {
   themeTemplates, type ThemeTemplate, type InsertThemeTemplate
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, asc, desc, sql, and } from "drizzle-orm";
+import { eq, asc, desc, sql, and, inArray } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -102,6 +102,8 @@ export interface IStorage {
   getExamAttemptsByExam(examId: number): Promise<ExamAttempt[]>;
   createExamAttempt(attempt: InsertExamAttempt): Promise<ExamAttempt>;
   updateExamAttempt(id: number, attempt: Partial<ExamAttempt>): Promise<ExamAttempt | undefined>;
+  /** Removes attempts so listed students can start the exam again (admin retake). */
+  resetExamAttemptsForUsers(examId: number, userIds: number[]): Promise<number>;
   getAllExamAttemptsForAdmin(tenantId: number): Promise<any[]>;
   gradeExamAttempt(attemptId: number, feedback: string, tenantId: number): Promise<ExamAttempt>;
   getStudentExamResults(userId: number): Promise<any[]>;
@@ -663,6 +665,15 @@ export class DatabaseStorage implements IStorage {
       .where(eq(examAttempts.id, id))
       .returning();
     return updatedAttempt;
+  }
+
+  async resetExamAttemptsForUsers(examId: number, userIds: number[]): Promise<number> {
+    const unique = Array.from(new Set(userIds.filter((id) => Number.isFinite(id) && id > 0)));
+    if (unique.length === 0) return 0;
+    const result = await db
+      .delete(examAttempts)
+      .where(and(eq(examAttempts.examId, examId), inArray(examAttempts.userId, unique)));
+    return result.rowCount ?? 0;
   }
 
   async getAllExamAttemptsForAdmin(tenantId: number): Promise<any[]> {
@@ -1333,6 +1344,10 @@ export class MemStorage implements IStorage {
   }
   
   async updateExamAttempt(id: number, attemptData: Partial<ExamAttempt>): Promise<ExamAttempt | undefined> {
+    throw new Error("MemStorage is no longer used. Please use DatabaseStorage instead.");
+  }
+
+  async resetExamAttemptsForUsers(_examId: number, _userIds: number[]): Promise<number> {
     throw new Error("MemStorage is no longer used. Please use DatabaseStorage instead.");
   }
 

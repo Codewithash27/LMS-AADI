@@ -20,7 +20,9 @@ import {
   Send,
   Ban,
   Clock,
+  RotateCcw,
 } from "lucide-react";
+import { ExamAllowRetakeDialog } from "@/components/exams/exam-allow-retake-dialog";
 import {
   TableCell,
   TableRow,
@@ -55,6 +57,7 @@ export default function AdminExams() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [retakeExam, setRetakeExam] = useState<any>(null);
   const { toast } = useToast();
 
   const { data: exams = [], isLoading } = useQuery({
@@ -352,6 +355,18 @@ export default function AdminExams() {
                         </Button>
                       </ActionTooltip>
                     </Link>
+                    <ActionTooltip label="Allow retake (student or batch)">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-9 w-9 p-0 text-teal-700 hover:bg-teal-50"
+                        aria-label="Allow retake"
+                        onClick={() => setRetakeExam(exam)}
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
+                    </ActionTooltip>
                     <ActionTooltip label="Edit exam">
                       <Button
                         type="button"
@@ -390,6 +405,14 @@ export default function AdminExams() {
         courses={courses}
         batches={batches}
         exam={selectedExam}
+      />
+
+      <ExamAllowRetakeDialog
+        exam={retakeExam ? { id: retakeExam.id, title: retakeExam.title, courseId: retakeExam.courseId } : null}
+        open={!!retakeExam}
+        onOpenChange={(open) => {
+          if (!open) setRetakeExam(null);
+        }}
       />
 
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
