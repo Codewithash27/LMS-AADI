@@ -151,7 +151,7 @@ export default function AdminThemeStudio() {
       <Tabs defaultValue="gallery" className="w-full">
         <TabsList className="grid grid-cols-2 w-full max-w-md bg-muted/60 p-1 rounded-xl">
           <TabsTrigger value="gallery" className="gap-2 rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm">
-            <Palette className="w-4 h-4" /> Preset Gallery (21)
+            <Palette className="w-4 h-4" /> Preset Gallery (25)
           </TabsTrigger>
           <TabsTrigger value="custom" className="gap-2 rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm">
             <Sliders className="w-4 h-4" /> Token Editor
@@ -186,7 +186,7 @@ export default function AdminThemeStudio() {
                     }`}
                   >
                     <CardHeader className="p-4 pb-3 flex flex-row items-start justify-between space-y-0">
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="w-5 h-5 rounded-full bg-foreground text-background text-xs font-bold flex items-center justify-center">
                             {displayIdx}
@@ -194,6 +194,21 @@ export default function AdminThemeStudio() {
                           <CardTitle className="text-base font-bold">{preset.name}</CardTitle>
                         </div>
                         <CardDescription className="text-xs mt-0.5">{preset.tag}</CardDescription>
+                        {preset.swatches && preset.swatches.length > 0 && (
+                          <div
+                            className="mt-2 flex h-2 w-full overflow-hidden rounded-full border border-border/40"
+                            aria-hidden
+                          >
+                            {preset.swatches.map((hex) => (
+                              <div
+                                key={hex}
+                                className="min-w-0 flex-1"
+                                style={{ backgroundColor: hex }}
+                                title={hex}
+                              />
+                            ))}
+                          </div>
+                        )}
                       </div>
                       {isSelected && (
                         <span className="p-1 rounded-full bg-primary text-primary-foreground">

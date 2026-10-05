@@ -73,4 +73,6 @@ export interface ThemePreset {
   tag: string;
   tokenOverrides: ThemeTokenOverrides;
   isPreset?: boolean;
+  /** Source palette hex swatches (darkest → lightest), for gallery preview */
+  swatches?: string[];
 }

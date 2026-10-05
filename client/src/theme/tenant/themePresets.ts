@@ -1,7 +1,6 @@
 /**
- * Token-Based Theme Engine — 20 Curated Palette Presets
- * Each preset is a ThemeTokenOverrides object that can be applied via ThemeProvider.
- * Derived from the Color Scheme Gallery (Untitled-4 HTML file).
+ * Token-Based Theme Engine — Curated palette presets
+ * Each preset maps a full color scheme to ThemeTokenOverrides for Theme Studio / tenant save.
  */
 import type { ThemePreset } from "./types";
 
@@ -244,6 +243,58 @@ export const THEME_PRESETS: ThemePreset[] = [
       border:     { default: "#EFDAE7", radius: "0.875rem" },
       text:       { primary: "#301325", muted: "#83657A" },
       typography: { fontFamilyDisplay: "Plus Jakarta Sans", fontFamilyBody: "DM Sans" },
+    },
+  },
+  {
+    name: "Cool Slate",
+    tag: "Monochrome navy — corporate dashboard",
+    swatches: ["#06141B", "#11212D", "#253745", "#4A5C6A", "#9BA8AB", "#CCD0CF"],
+    tokenOverrides: {
+      primary:    { main: "#253745", light: "#4A5C6A", dark: "#11212D", contrast: "#ffffff", subtle: "#E4E8E9" },
+      secondary:  { main: "#4A5C6A", light: "#9BA8AB", dark: "#253745", contrast: "#ffffff" },
+      background: { default: "#F2F4F4", paper: "#FFFFFF", subtle: "#E8EBEC", sidebar: "#E4E7E8" },
+      border:     { default: "#CCD0CF", radius: "0.625rem" },
+      text:       { primary: "#06141B", muted: "#4A5C6A" },
+      typography: { fontFamilyDisplay: "Space Grotesk", fontFamilyBody: "Inter" },
+    },
+  },
+  {
+    name: "Navy Crimson",
+    tag: "Deep navy with warm red accent",
+    swatches: ["#181A2F", "#242E49", "#37415C", "#FDA481", "#D41B2D", "#541628"],
+    tokenOverrides: {
+      primary:    { main: "#D41B2D", light: "#FDA481", dark: "#541628", contrast: "#ffffff", subtle: "#FEEAE5" },
+      secondary:  { main: "#37415C", light: "#242E49", dark: "#181A2F", contrast: "#ffffff" },
+      background: { default: "#F7F6FA", paper: "#FFFFFF", subtle: "#FDF0EB", sidebar: "#EEF0F5" },
+      border:     { default: "#E0E3EA", radius: "0.5rem" },
+      text:       { primary: "#181A2F", muted: "#37415C" },
+      typography: { fontFamilyDisplay: "Sora", fontFamilyBody: "Inter" },
+    },
+  },
+  {
+    name: "Plum Dusk",
+    tag: "Royal purple & soft cream",
+    swatches: ["#190D19", "#2B124C", "#522B5B", "#854F6C", "#DFB6B2", "#FBE4D8"],
+    tokenOverrides: {
+      primary:    { main: "#854F6C", light: "#DFB6B2", dark: "#2B124C", contrast: "#ffffff", subtle: "#FBE4D8" },
+      secondary:  { main: "#522B5B", light: "#854F6C", dark: "#190D19", contrast: "#ffffff" },
+      background: { default: "#FBF4F0", paper: "#FFFFFF", subtle: "#FBE4D8", sidebar: "#F5EDE8" },
+      border:     { default: "#E8D5CC", radius: "0.875rem" },
+      text:       { primary: "#190D19", muted: "#522B5B" },
+      typography: { fontFamilyDisplay: "Fraunces", fontFamilyBody: "DM Sans" },
+    },
+  },
+  {
+    name: "Indigo Pulse",
+    tag: "Bold indigo & coral red",
+    swatches: ["#1A1024", "#5136CE", "#FE8482", "#A42527", "#4B141B", "#F3F1FA"],
+    tokenOverrides: {
+      primary:    { main: "#5136CE", light: "#7B63E8", dark: "#3D28A0", contrast: "#ffffff", subtle: "#EEEAFC" },
+      secondary:  { main: "#A42527", light: "#FE8482", dark: "#4B141B", contrast: "#ffffff" },
+      background: { default: "#F6F5FC", paper: "#FFFFFF", subtle: "#EEEAFB", sidebar: "#E8E4F5" },
+      border:     { default: "#DDD8EF", radius: "0.75rem" },
+      text:       { primary: "#1A1024", muted: "#5A4A72" },
+      typography: { fontFamilyDisplay: "Plus Jakarta Sans", fontFamilyBody: "Inter" },
     },
   },
 ];
