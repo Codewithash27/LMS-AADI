@@ -49,7 +49,23 @@ import {
   Video,
   Plus,
   UserIcon,
+  ClipboardList,
+  PenLine,
+  Shuffle,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  buildCourseQuizQuestionsFromPool,
+  parseMcqQuestionsFile,
+  type ParsedMcqQuestion,
+} from "@/lib/mcq-question-import";
 
 const COURSE_FORM_ID = "course-editor-form";
 
@@ -115,6 +131,14 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
     { id: 3, text: "", isCorrect: false },
     { id: 4, text: "", isCorrect: false }
   ]);
+  const [quizAddModuleId, setQuizAddModuleId] = useState<number | null>(null);
+  const [quizBuilderMode, setQuizBuilderMode] = useState<"manual" | "upload">("manual");
+  const [quizPdfPool, setQuizPdfPool] = useState<ParsedMcqQuestion[]>([]);
+  const [quizPdfFileName, setQuizPdfFileName] = useState("");
+  const [quizImportCount, setQuizImportCount] = useState(10);
+  const [isParsingQuizDoc, setIsParsingQuizDoc] = useState(false);
+  const quizDocInputRef = useRef<HTMLInputElement>(null);
+  const quizDocPickerModuleRef = useRef<number | null>(null);
 
   const form = useForm<CourseMetadataFormValues>({
     resolver: zodResolver(courseMetadataSchema),
@@ -269,16 +293,51 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
     return data.url;
   };
 
+  const applyPendingLessonEdits = (source: ModuleType[]): ModuleType[] => {
+    if (!editingLessonIds) return source;
+    return source.map((module) => {
+      if (module.id !== editingLessonIds.moduleId) return module;
+      return {
+        ...module,
+        lessons: module.lessons?.map((lesson) => {
+          if (lesson.id !== editingLessonIds.lessonId) return lesson;
+          if (lesson.contentType === "quiz") {
+            return {
+              ...lesson,
+              title: editLessonTitle.trim() || lesson.title,
+              duration: lesson.duration ?? 15,
+              quizData: {
+                questions: quizQuestions,
+                builderMode: quizBuilderMode,
+              },
+            };
+          }
+          return {
+            ...lesson,
+            title: editLessonTitle.trim() || lesson.title,
+            content: editLessonContent,
+          };
+        }),
+      };
+    });
+  };
+
+  const nextClientLessonId = (lessons: LessonType[] | undefined) => {
+    const list = lessons || [];
+    const minNeg = list.reduce((min, l) => (l.id < min ? l.id : min), 0);
+    return minNeg <= 0 ? minNeg - 1 : -1;
+  };
+
   // Save all modules and their lessons to the server
-  const saveAllModules = async (courseId: number) => {
+  const saveAllModules = async (courseId: number, modulesSnapshot: ModuleType[]) => {
     try {
       // First, fetch existing modules to determine what needs to be updated vs. created
       const modulesResponse = await apiRequest("GET", `/api/courses/${courseId}/modules`);
       const existingModules = await modulesResponse.json();
       
       // Process each module
-      for (let i = 0; i < modules.length; i++) {
-        const module = modules[i];
+      for (let i = 0; i < modulesSnapshot.length; i++) {
+        const module = modulesSnapshot[i];
         let moduleId;
         
         // Check if this is an existing module or a new one
@@ -314,40 +373,55 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
           for (let j = 0; j < module.lessons.length; j++) {
             const lesson = module.lessons[j];
             
-            // Check if lesson already exists
-            const existingLesson = existingLessons.find((l: any) => l.id === lesson.id);
-            
-            // Prepare lesson data based on content type
+            const existingLesson =
+              lesson.id > 0
+                ? existingLessons.find((l: any) => l.id === lesson.id)
+                : undefined;
+
+            const quizPayload =
+              lesson.contentType === "quiz" && lesson.quizData
+                ? {
+                    questions: lesson.quizData.questions ?? [],
+                    ...(lesson.quizData.builderMode
+                      ? { builderMode: lesson.quizData.builderMode }
+                      : {}),
+                  }
+                : null;
+
             let lessonData: any = {
-              title: lesson.title,
-              contentType: lesson.contentType || 'text',
+              title: (lesson.title || "").trim() || "Untitled lesson",
+              contentType: lesson.contentType || "text",
               moduleId: moduleId,
               order: j + 1,
-              isRequired: lesson.isRequired || true,
-              duration: lesson.duration || null
+              isRequired: lesson.isRequired ?? true,
+              duration:
+                lesson.contentType === "quiz"
+                  ? lesson.duration && lesson.duration > 0
+                    ? lesson.duration
+                    : 15
+                  : lesson.duration ?? null,
             };
-            
-            // Add appropriate content based on type
-            if (lesson.contentType === 'quiz' && lesson.quizData) {
-              lessonData.content = JSON.stringify(lesson.quizData) || '';
-              lessonData.quizData = lesson.quizData;
+
+            if (lesson.contentType === "quiz" && quizPayload) {
+              lessonData.content = JSON.stringify(quizPayload);
+              lessonData.quizData = quizPayload;
             } else {
-              lessonData.content = lesson.content || '';
+              lessonData.content = lesson.content || "";
               lessonData.quizData = null;
             }
-            
+
             if (existingLesson) {
-              // Update existing lesson
               await apiRequest("PUT", `/api/lessons/${lesson.id}`, lessonData);
             } else {
-              // Create new lesson
-              await apiRequest("POST", `/api/lessons`, lessonData);
+              await apiRequest("POST", "/api/lessons", lessonData);
             }
           }
           
           // Delete lessons that are no longer in the editor
           for (const existingLesson of existingLessons) {
-            const stillExists = module.lessons.some(l => l.id === existingLesson.id);
+            const stillExists = module.lessons.some(
+              (l) => l.id > 0 && l.id === existingLesson.id
+            );
             if (!stillExists) {
               await apiRequest("DELETE", `/api/lessons/${existingLesson.id}`);
             }
@@ -355,9 +429,16 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
         }
       }
       
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === "string" && key.startsWith("/api/modules/");
+        },
+      });
+
       // Delete modules that are no longer in the editor
       for (const existingModule of existingModules) {
-        const stillExists = modules.some(m => m.id === existingModule.id);
+        const stillExists = modulesSnapshot.some(m => m.id === existingModule.id);
         if (!stillExists) {
           await apiRequest("DELETE", `/api/modules/${existingModule.id}`);
         }
@@ -384,11 +465,6 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
       return response.json();
     },
     onSuccess: async (newCourse) => {
-      // Save all modules and lessons after course creation
-      if (newCourse.id && modules.length > 0) {
-        await saveAllModules(newCourse.id);
-      }
-      
       queryClient.invalidateQueries({ queryKey: ["/api/courses"] });
       toast({
         title: "Course created successfully",
@@ -413,12 +489,7 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
       const response = await apiRequest("PUT", `/api/courses/${course.id}`, data);
       return response.json();
     },
-    onSuccess: async (updatedCourse) => {
-      // Save all modules and lessons after course update
-      if (updatedCourse.id && modules.length > 0) {
-        await saveAllModules(updatedCourse.id);
-      }
-      
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["/api/courses"] });
       toast({
         title: "Course updated successfully",
@@ -540,10 +611,24 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
 
       console.log("Submitting course data with thumbnail:", submitData.thumbnail);
 
+      const modulesSnapshot = applyPendingLessonEdits(modules);
+      setModules(modulesSnapshot);
+      if (editingLessonIds) {
+        setEditingLessonIds(null);
+        setEditLessonTitle("");
+        setEditLessonContent("");
+      }
+
       if (course) {
-        await updateCourseMutation.mutateAsync(submitData);
+        const updatedCourse = await updateCourseMutation.mutateAsync(submitData);
+        if (updatedCourse?.id && modulesSnapshot.length > 0) {
+          await saveAllModules(updatedCourse.id, modulesSnapshot);
+        }
       } else {
-        await createCourseMutation.mutateAsync(submitData);
+        const newCourse = await createCourseMutation.mutateAsync(submitData);
+        if (newCourse?.id && modulesSnapshot.length > 0) {
+          await saveAllModules(newCourse.id, modulesSnapshot);
+        }
       }
     } catch (error) {
       console.error("Error in form submission:", error);
@@ -579,29 +664,183 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
     }]);
   };
 
-  const addLesson = (moduleId: number, contentType: 'video' | 'text' | 'pdf' | 'quiz' = 'text') => {
-    setModules(modules.map(module => {
-      if (module.id === moduleId) {
+  const openQuizLessonEditor = (
+    moduleId: number,
+    lessonId: number,
+    title: string,
+    questions: QuizQuestion[],
+    mode: "manual" | "upload"
+  ) => {
+    setEditingLessonIds({ moduleId, lessonId });
+    setEditLessonTitle(title);
+    setEditLessonContent("");
+    setQuizQuestions(questions);
+    setQuizBuilderMode(mode);
+    setCurrentQuestion("");
+    setQuestionOptions([
+      { id: 1, text: "", isCorrect: false },
+      { id: 2, text: "", isCorrect: false },
+      { id: 3, text: "", isCorrect: false },
+      { id: 4, text: "", isCorrect: false },
+    ]);
+  };
+
+  const addLesson = (
+    moduleId: number,
+    contentType: "video" | "text" | "pdf" | "quiz" = "text",
+    opts?: {
+      autoEdit?: boolean;
+      quizQuestions?: QuizQuestion[];
+      quizMode?: "manual" | "upload";
+    }
+  ) => {
+    type CreatedQuizEdit = {
+      moduleId: number;
+      lessonId: number;
+      title: string;
+      questions: QuizQuestion[];
+      mode: "manual" | "upload";
+    };
+    const createdRef: { current?: CreatedQuizEdit } = {};
+
+    setModules((prev) =>
+      prev.map((module) => {
+        if (module.id !== moduleId) return module;
         const lessons = module.lessons || [];
-        const newLessonId = lessons.length > 0 
-          ? Math.max(...lessons.map(l => l.id)) + 1 
-          : 1;
-        
-        return {
-          ...module,
-          lessons: [...lessons, {
-            id: newLessonId,
-            title: `New ${contentType.charAt(0).toUpperCase() + contentType.slice(1)} Lesson`,
-            content: '',
-            contentType: contentType,
-            duration: contentType === 'video' ? 30 : undefined,
-            isRequired: true,
-            quizData: contentType === 'quiz' ? { questions: [] } : undefined
-          }]
+        const newLessonId = nextClientLessonId(lessons);
+        const title = `New ${contentType.charAt(0).toUpperCase() + contentType.slice(1)} Lesson`;
+        const initialQuestions = opts?.quizQuestions ?? [];
+        const newLesson: LessonType = {
+          id: newLessonId,
+          title,
+          content: "",
+          contentType,
+          duration:
+            contentType === "video" ? 30 : contentType === "quiz" ? 15 : undefined,
+          isRequired: true,
+          quizData:
+            contentType === "quiz"
+              ? { questions: initialQuestions, builderMode: opts?.quizMode ?? "manual" }
+              : undefined,
         };
+        if (opts?.autoEdit && contentType === "quiz") {
+          createdRef.current = {
+            moduleId,
+            lessonId: newLessonId,
+            title,
+            questions: initialQuestions,
+            mode: opts.quizMode ?? "manual",
+          };
+        }
+        return { ...module, isOpen: true, lessons: [...lessons, newLesson] };
+      })
+    );
+
+    const created = createdRef.current;
+    if (created) {
+      queueMicrotask(() =>
+        openQuizLessonEditor(
+          created.moduleId,
+          created.lessonId,
+          created.title,
+          created.questions,
+          created.mode
+        )
+      );
+    }
+  };
+
+  const handleQuizAddManual = () => {
+    if (quizAddModuleId == null) return;
+    addLesson(quizAddModuleId, "quiz", { autoEdit: true, quizMode: "manual" });
+    setQuizAddModuleId(null);
+  };
+
+  const handleQuizAddUploadClick = () => {
+    if (quizAddModuleId == null) return;
+    quizDocPickerModuleRef.current = quizAddModuleId;
+    setQuizAddModuleId(null);
+    quizDocInputRef.current?.click();
+  };
+
+  const importParsedQuizDocument = (
+    parsed: ParsedMcqQuestion[],
+    fileName: string,
+    parseStats?: { total: number; withOptions: number; withCorrect: number }
+  ) => {
+    const defaultCount = Math.min(10, parsed.length) || parsed.length;
+    setQuizPdfPool(parsed);
+    setQuizPdfFileName(fileName);
+    setQuizImportCount(defaultCount);
+    const built = buildCourseQuizQuestionsFromPool(parsed, defaultCount);
+    setQuizQuestions(built);
+    setQuizBuilderMode("upload");
+    let desc = `Imported ${built.length} MCQ(s) from ${parsed.length} in the document.`;
+    if (parseStats) {
+      desc += ` Options: ${parseStats.withOptions}, correct: ${parseStats.withCorrect}.`;
+    }
+    toast({ title: "Quiz document parsed", description: desc });
+    return built;
+  };
+
+  const parseQuizDocumentFile = async (file: File) => {
+    setIsParsingQuizDoc(true);
+    try {
+      const { questions: parsed, fileName, parseStats } =
+        await parseMcqQuestionsFile(file);
+      if (parsed.length === 0) {
+        throw new Error("No questions found in this document.");
       }
-      return module;
-    }));
+      return importParsedQuizDocument(parsed, fileName, parseStats);
+    } catch (err: unknown) {
+      toast({
+        title: "Could not parse document",
+        description: err instanceof Error ? err.message : "Try another file.",
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setIsParsingQuizDoc(false);
+    }
+  };
+
+  const handleQuizDocumentSelected = async (file: File | null) => {
+    const moduleId = quizDocPickerModuleRef.current;
+    if (!file || moduleId == null) return;
+    quizDocPickerModuleRef.current = null;
+
+    const built = await parseQuizDocumentFile(file);
+    if (quizDocInputRef.current) quizDocInputRef.current.value = "";
+    if (!built) return;
+
+    addLesson(moduleId, "quiz", {
+      autoEdit: true,
+      quizMode: "upload",
+      quizQuestions: built,
+    });
+  };
+
+  const handleQuizDocumentInEditor = async (file: File | null) => {
+    if (!file) return;
+    await parseQuizDocumentFile(file);
+  };
+
+  const applyQuizQuestionsFromPool = (count?: number) => {
+    if (quizPdfPool.length === 0) {
+      toast({
+        title: "No document loaded",
+        description: "Upload a PDF or Word question bank first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const n = count ?? quizImportCount ?? quizPdfPool.length;
+    const built = buildCourseQuizQuestionsFromPool(quizPdfPool, n);
+    setQuizQuestions(built);
+    toast({
+      title: "Questions updated",
+      description: `Using ${built.length} question(s) from the uploaded document.`,
+    });
   };
 
   // Start editing a module
@@ -662,11 +901,14 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
       setEditLessonContent(lesson.content || '');
       
       // If this is a quiz, set up the quiz questions
-      if (lesson.contentType === 'quiz' && lesson.quizData && lesson.quizData.questions) {
+      if (lesson.contentType === "quiz" && lesson.quizData?.questions) {
         setQuizQuestions(lesson.quizData.questions);
+        setQuizBuilderMode(
+          lesson.quizData.builderMode === "upload" ? "upload" : "manual"
+        );
       } else {
-        // Reset quiz questions for non-quiz lessons
         setQuizQuestions([]);
+        setQuizBuilderMode("manual");
       }
     }
   };
@@ -677,41 +919,42 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
     
     setIsSavingLesson(true);
     
-    setModules(modules.map(module => 
-      module.id === editingLessonIds.moduleId 
-        ? { 
-            ...module, 
-            lessons: module.lessons?.map(lesson => {
-              if (lesson.id === editingLessonIds.lessonId) {
-                // Check if this is a quiz lesson
-                if (lesson.contentType === 'quiz') {
+    setModules((prev) =>
+      prev.map((module) =>
+        module.id === editingLessonIds.moduleId
+          ? {
+              ...module,
+              lessons: module.lessons?.map((lesson) => {
+                if (lesson.id !== editingLessonIds.lessonId) return lesson;
+                if (lesson.contentType === "quiz") {
                   return {
                     ...lesson,
-                    title: editLessonTitle,
+                    title: editLessonTitle.trim() || lesson.title,
+                    duration: lesson.duration ?? 15,
                     quizData: {
-                      questions: quizQuestions
-                    }
-                  };
-                } else {
-                  // For non-quiz lessons
-                  return {
-                    ...lesson,
-                    title: editLessonTitle,
-                    content: editLessonContent
+                      questions: quizQuestions,
+                      builderMode: quizBuilderMode,
+                    },
                   };
                 }
-              }
-              return lesson;
-            })
-          } 
-        : module
-    ));
+                return {
+                  ...lesson,
+                  title: editLessonTitle.trim() || lesson.title,
+                  content: editLessonContent,
+                };
+              }),
+            }
+          : module
+      )
+    );
     
     // Reset editing state
     setEditingLessonIds(null);
     setEditLessonTitle('');
     setEditLessonContent('');
     setQuizQuestions([]);
+    setQuizPdfPool([]);
+    setQuizPdfFileName("");
     setCurrentQuestion('');
     setQuestionOptions([
       { id: 1, text: "", isCorrect: false },
@@ -734,6 +977,8 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
     setEditLessonTitle('');
     setEditLessonContent('');
     setQuizQuestions([]);
+    setQuizPdfPool([]);
+    setQuizPdfFileName("");
     setCurrentQuestion('');
     setQuestionOptions([
       { id: 1, text: "", isCorrect: false },
@@ -1244,6 +1489,124 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                                   {lesson.contentType === 'quiz' ? (
                                     <div className="border rounded-md p-4 bg-gray-50">
                                       <h4 className="font-medium mb-3">Quiz Questions</h4>
+
+                                      <div className="grid gap-3 sm:grid-cols-2 mb-4">
+                                        <button
+                                          type="button"
+                                          onClick={() => setQuizBuilderMode("manual")}
+                                          className={
+                                            "rounded-xl border p-3 text-left transition-colors " +
+                                            (quizBuilderMode === "manual"
+                                              ? "border-primary bg-primary/5"
+                                              : "border-border bg-white hover:bg-muted/40")
+                                          }
+                                        >
+                                          <p className="text-sm font-semibold flex items-center gap-2">
+                                            <PenLine className="h-4 w-4" /> Manual entry
+                                          </p>
+                                          <p className="mt-1 text-xs text-muted-foreground">
+                                            Add questions and mark correct options.
+                                          </p>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setQuizBuilderMode("upload")}
+                                          className={
+                                            "rounded-xl border p-3 text-left transition-colors " +
+                                            (quizBuilderMode === "upload"
+                                              ? "border-primary bg-primary/5"
+                                              : "border-border bg-white hover:bg-muted/40")
+                                          }
+                                        >
+                                          <p className="text-sm font-semibold flex items-center gap-2">
+                                            <Upload className="h-4 w-4" /> Upload PDF / Word
+                                          </p>
+                                          <p className="mt-1 text-xs text-muted-foreground">
+                                            Same MCQ format as exams (A) B) C) D), Answer: B).
+                                          </p>
+                                        </button>
+                                      </div>
+
+                                      {quizBuilderMode === "upload" && (
+                                        <div className="mb-4 space-y-3 rounded-xl border border-dashed border-border bg-white p-4">
+                                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                            <div>
+                                              <p className="text-sm font-semibold">
+                                                {quizPdfFileName || "No file selected"}
+                                              </p>
+                                              <p className="text-xs text-muted-foreground">
+                                                PDF (.pdf) or Word (.docx)
+                                              </p>
+                                              {quizPdfPool.length > 0 && (
+                                                <Badge className="mt-2">
+                                                  {quizPdfPool.length} in pool
+                                                </Badge>
+                                              )}
+                                            </div>
+                                            <label className="inline-flex cursor-pointer">
+                                              <input
+                                                type="file"
+                                                accept="application/pdf,.pdf,.docx,.doc"
+                                                className="sr-only"
+                                                disabled={isParsingQuizDoc}
+                                                onChange={(e) => {
+                                                  void handleQuizDocumentInEditor(
+                                                    e.target.files?.[0] ?? null
+                                                  );
+                                                  e.target.value = "";
+                                                }}
+                                              />
+                                              <span className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
+                                                <FileText className="h-4 w-4" />
+                                                {isParsingQuizDoc
+                                                  ? "Parsing..."
+                                                  : quizPdfPool.length
+                                                    ? "Replace document"
+                                                    : "Upload document"}
+                                              </span>
+                                            </label>
+                                          </div>
+                                          {quizPdfPool.length > 0 && (
+                                            <div className="flex flex-wrap items-end gap-3">
+                                              <div>
+                                                <Label className="text-xs">
+                                                  Questions to use
+                                                </Label>
+                                                <Input
+                                                  type="number"
+                                                  min={1}
+                                                  max={quizPdfPool.length}
+                                                  value={quizImportCount}
+                                                  onChange={(e) =>
+                                                    setQuizImportCount(
+                                                      Math.min(
+                                                        quizPdfPool.length,
+                                                        Math.max(
+                                                          1,
+                                                          parseInt(e.target.value, 10) || 1
+                                                        )
+                                                      )
+                                                    )
+                                                  }
+                                                  className="mt-1 w-24"
+                                                />
+                                              </div>
+                                              <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="secondary"
+                                                className="gap-2"
+                                                onClick={() =>
+                                                  applyQuizQuestionsFromPool()
+                                                }
+                                              >
+                                                <Shuffle className="h-4 w-4" />
+                                                Pick from document
+                                              </Button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
                                       
                                       {/* Existing Questions List */}
                                       {quizQuestions.length > 0 && (
@@ -1281,7 +1644,8 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                                         </div>
                                       )}
                                       
-                                      {/* Add New Question Form */}
+                                      {/* Add New Question Form (manual) */}
+                                      {quizBuilderMode === "manual" && (
                                       <div className="border-t pt-4 mt-4">
                                         <h5 className="text-sm font-medium mb-2">Add New Question</h5>
                                         
@@ -1331,6 +1695,7 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                                           </Button>
                                         </div>
                                       </div>
+                                      )}
                                     </div>
                                   ) : (
                                     <Textarea
@@ -1421,9 +1786,9 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                           type="button" 
                           variant="outline" 
                           className="text-sm" 
-                          onClick={() => addLesson(module.id, 'quiz')}
+                          onClick={() => setQuizAddModuleId(module.id)}
                         >
-                          <Edit className="h-4 w-4 mr-1 text-teal-600" />
+                          <ClipboardList className="h-4 w-4 mr-1 text-teal-600" />
                           Add Quiz
                         </Button>
                       </div>
@@ -1494,6 +1859,65 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
           </FormSection>
         </form>
       </Form>
+      <input
+        ref={quizDocInputRef}
+        type="file"
+        accept="application/pdf,.pdf,.docx,.doc"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          void handleQuizDocumentSelected(f);
+        }}
+      />
+
+      <Dialog
+        open={quizAddModuleId != null}
+        onOpenChange={(open) => {
+          if (!open) setQuizAddModuleId(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-primary" />
+              Add quiz lesson
+            </DialogTitle>
+            <DialogDescription>
+              Build MCQ questions manually or import from the same PDF/Word format used for exams.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2 py-2">
+            <button
+              type="button"
+              onClick={handleQuizAddManual}
+              className="rounded-xl border border-border bg-white p-4 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors"
+            >
+              <PenLine className="h-5 w-5 text-primary mb-2" />
+              <p className="text-sm font-semibold">Manual</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Type each question and mark the correct option.
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={handleQuizAddUploadClick}
+              disabled={isParsingQuizDoc}
+              className="rounded-xl border border-border bg-white p-4 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors disabled:opacity-60"
+            >
+              <Upload className="h-5 w-5 text-primary mb-2" />
+              <p className="text-sm font-semibold">Upload document</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Parse MCQs with options and Answer: line from PDF or Word.
+              </p>
+            </button>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setQuizAddModuleId(null)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </CreateFormDialog>
   );
 }

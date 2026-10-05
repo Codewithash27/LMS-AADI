@@ -38,6 +38,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { parseLessonQuizData } from "@/lib/course-quiz-data";
 
 type Lesson = {
   id: number;
@@ -90,14 +91,12 @@ export default function StudentTakeQuiz() {
     [lessons, lessonId]
   );
 
-  const questionCount = useMemo(() => {
-    if (!lesson?.quizData) return 0;
-    const data =
-      typeof lesson.quizData === "string"
-        ? JSON.parse(lesson.quizData)
-        : lesson.quizData;
-    return data?.questions?.length || 0;
-  }, [lesson]);
+  const quizPayload = useMemo(
+    () => (lesson ? parseLessonQuizData(lesson) : null),
+    [lesson]
+  );
+
+  const questionCount = quizPayload?.questions?.length ?? 0;
 
   const fullTimeLimitSeconds = useMemo(() => {
     const minutes = lesson?.duration && lesson.duration > 0 ? lesson.duration : 15;
@@ -574,7 +573,7 @@ export default function StudentTakeQuiz() {
           <div className="flex-1 min-h-0 w-full flex flex-col">
             <QuizComponent
               key={attemptSession}
-              quizData={lesson.quizData}
+              quizData={quizPayload ?? { questions: [] }}
               mode="secure"
               title={lesson.title}
               timeLimitSeconds={

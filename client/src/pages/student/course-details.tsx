@@ -27,6 +27,7 @@ import {
 import { getCourseThumbnailSrc } from "@/lib/course-thumbnail";
 import { hasQuizDraft, loadQuizDraft } from "@/lib/quiz-draft";
 import { getQuizAttempts } from "@/lib/quiz-attempts";
+import { parseLessonQuizData } from "@/lib/course-quiz-data";
 
 /** Pull a usable http(s) URL out of lesson content (plain text or light HTML). */
 function extractLessonUrl(content: string | null | undefined): string | null {
@@ -176,7 +177,7 @@ export default function StudentCourseDetails() {
       case 'video':
         return <Video className="h-4 w-4" />;
       case 'quiz':
-        return <FileText className="h-4 w-4" />;
+        return <ClipboardList className="h-4 w-4" />;
       case 'pdf':
         return <FileText className="h-4 w-4" />;
       case 'text':
@@ -494,17 +495,8 @@ export default function StudentCourseDetails() {
                               <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                                 <span className="inline-flex items-center gap-1.5">
                                   <FileText className="h-4 w-4" />
-                                  {(() => {
-                                    try {
-                                      const data =
-                                        typeof activeLesson.quizData === "string"
-                                          ? JSON.parse(activeLesson.quizData)
-                                          : activeLesson.quizData;
-                                      return data?.questions?.length || 0;
-                                    } catch {
-                                      return 0;
-                                    }
-                                  })()}{" "}
+                                  {parseLessonQuizData(activeLesson)?.questions?.length ??
+                                    0}{" "}
                                   questions
                                 </span>
                                 <span className="inline-flex items-center gap-1.5">
