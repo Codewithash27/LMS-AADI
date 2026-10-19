@@ -40,6 +40,7 @@ export type DataTableProps = {
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
   pageSizeOptions?: number[];
+  variant?: "default" | "glass";
 };
 
 /**
@@ -59,7 +60,9 @@ export default function DataTable({
   onPageChange,
   onPageSizeChange,
   pageSizeOptions = [10, 25, 50],
+  variant = "default",
 }: DataTableProps) {
+  const glass = variant === "glass";
   const showPagination = typeof onPageChange === "function";
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = Math.min(page * pageSize, total);
@@ -68,7 +71,9 @@ export default function DataTable({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-[var(--radius)] border border-border bg-card shadow-card-soft",
+        glass
+          ? "overflow-hidden rounded-[20px] border border-white/10 bg-[rgba(14,14,22,0.55)] text-[#F4F4F8] shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl"
+          : "overflow-hidden rounded-[var(--radius)] border border-border bg-card shadow-card-soft",
         className
       )}
     >
@@ -95,7 +100,9 @@ export default function DataTable({
                     <TableHead
                       key={col.key}
                       className={cn(
-                        "h-11 border-0 bg-primary px-4 text-[11px] font-bold uppercase tracking-wider text-primary-foreground first:pl-5 last:pr-5",
+                        glass
+                          ? "h-11 border-0 bg-white/[0.04] px-4 text-[11px] font-semibold uppercase tracking-wider text-[#A1A1B5] first:pl-5 last:pr-5"
+                          : "h-11 border-0 bg-primary px-4 text-[11px] font-bold uppercase tracking-wider text-primary-foreground first:pl-5 last:pr-5",
                         col.align === "right" && "text-right",
                         col.align === "center" && "text-center",
                         col.className
@@ -106,21 +113,21 @@ export default function DataTable({
                   ))}
                 </TableRow>
               </TableHeader>
-              <TableBody className="[&_tr]:border-border/60">
+              <TableBody className={glass ? "[&_tr]:border-white/10" : "[&_tr]:border-border/60"}>
                 {children}
               </TableBody>
             </Table>
           </div>
 
           {showPagination ? (
-            <div className="flex flex-col gap-3 border-t border-border px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className={cn("flex flex-col gap-3 border-t px-5 py-3 sm:flex-row sm:items-center sm:justify-between", glass ? "border-white/10" : "border-border")}>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>Rows per page</span>
                 <Select
                   value={String(pageSize)}
                   onValueChange={(v) => onPageSizeChange?.(Number(v))}
                 >
-                  <SelectTrigger className="h-8 w-[72px] rounded-lg border-border bg-card text-sm">
+                  <SelectTrigger className={cn("h-8 w-[72px] rounded-lg text-sm", glass ? "border-white/10 bg-white/5 text-[#F4F4F8]" : "border-border bg-card")}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

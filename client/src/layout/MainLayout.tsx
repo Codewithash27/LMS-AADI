@@ -62,12 +62,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }, [logoutMutation]);
 
   const syncedDash = location === "/" || location.startsWith("/admin/dashboard");
+  const darkShell = syncedDash || location === "/admin/courses";
   const initials =
     `${user?.firstName?.charAt(0) || ""}${user?.lastName?.charAt(0) || ""}`.toUpperCase() ||
     "U";
 
   return (
-    <div className={cn("flex h-screen overflow-hidden bg-background", syncedDash && "dash-app")}>
+    <div className={cn("flex h-screen overflow-hidden bg-background", darkShell && "dash-app")}>
       <Sidebar
         mobileOpen={isMobile && mobileOpen}
         onMobileClose={closeMobile}
@@ -78,19 +79,19 @@ export default function MainLayout({ children }: MainLayoutProps) {
       <div
         className={cn(
           "main-content-premium flex min-h-0 min-w-0 flex-1 flex-col transition-[width,margin] duration-300 ease-out",
-          syncedDash && "gap-3 py-3 pr-3",
-          syncedDash && (isMobile ? "pl-3" : "pl-0")
+          darkShell && "gap-3 py-3 pr-3",
+          darkShell && (isMobile ? "pl-3" : "pl-0")
         )}
       >
         <header
           className={cn(
             "glass-appbar z-30 shrink-0",
-            syncedDash
+            darkShell
               ? "rounded-[22px] border border-white/10"
               : "sticky top-0 border-b border-border/70 shadow-sm"
           )}
         >
-          <div className={cn("flex items-center justify-between gap-3 px-3 sm:px-4", syncedDash ? "h-14" : "h-12")}>
+          <div className={cn("flex items-center justify-between gap-3 px-3 sm:px-4", darkShell ? "h-14" : "h-12")}>
             <div className="flex min-w-0 items-center gap-2">
               {isMobile && (
                 <button
@@ -103,7 +104,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 </button>
               )}
 
-              {syncedDash && user ? (
+              {darkShell && user ? (
                 <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
                   <span className="animate-wave-hand shrink-0 text-lg leading-none sm:text-xl" aria-hidden>
                     👋
@@ -132,7 +133,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
             {user && (
               <div className="flex min-w-0 items-center justify-end gap-2 sm:gap-3">
-                {!syncedDash && (
+                {!darkShell && (
                   <p className="hidden truncate text-[11px] text-muted-foreground md:block">
                     {greeting.text}, <span className="font-semibold text-foreground">{firstName}</span>
                   </p>
@@ -204,7 +205,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
           <div
             className={cn(
               "w-full min-w-0",
-              syncedDash ? "flex h-full min-h-0 min-w-0 flex-col" : "px-3 py-3 sm:px-4 md:px-5 md:py-4"
+              syncedDash
+                ? "flex h-full min-h-0 min-w-0 flex-col"
+                : darkShell
+                  ? "px-1 sm:px-2"
+                  : "px-3 py-3 sm:px-4 md:px-5 md:py-4"
             )}
           >
             {children}
@@ -214,7 +219,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         <footer
           className={cn(
             "z-20 flex shrink-0 items-center justify-between px-3 sm:px-4",
-            syncedDash
+            darkShell
               ? "h-11 rounded-[22px] border border-white/10"
               : "sticky bottom-0 h-9 border-t border-border bg-card"
           )}

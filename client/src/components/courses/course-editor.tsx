@@ -26,8 +26,9 @@ import {
   CreateFormDialog,
   CreateFormFooter,
   FormSection,
-  createFormControlClass,
-  createFormLabelClass,
+  createFormControlGlassClass,
+  createFormLabelGlassClass,
+  glassSelectContentClass,
 } from "@/components/ui/create-form-dialog";
 import {
   courseMetadataSchema,
@@ -1158,10 +1159,12 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
           ? "Update course details, content, and thumbnail."
           : "Set up a new course with modules, lessons, and a cover image."
       }
-      icon={<BookOpen className="h-7 w-7 text-white" />}
+      icon={<BookOpen className="h-5 w-5 text-white" />}
       maxWidth="max-w-4xl"
+      tone="glass"
       footer={
         <CreateFormFooter
+          tone="glass"
           formId={COURSE_FORM_ID}
           onCancel={() => onOpenChange(false)}
           submitLabel={course ? "Update Course" : "Create Course"}
@@ -1177,6 +1180,7 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
           className="space-y-4"
         >
           <FormSection
+            tone="glass"
             title="Course details"
             description="Title, description, category, and difficulty"
           >
@@ -1186,11 +1190,11 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                 name="title"
                 render={({ field }) => (
                   <FormItem className="sm:col-span-2">
-                    <FormLabel className={createFormLabelClass}>Course Title</FormLabel>
+                    <FormLabel className={createFormLabelGlassClass}>Course Title</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="e.g. Advanced Web Development with React"
-                        className={createFormControlClass}
+                        className={createFormControlGlassClass}
                         disabled={isSubmitting}
                         {...field}
                       />
@@ -1205,12 +1209,12 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                 name="description"
                 render={({ field }) => (
                   <FormItem className="sm:col-span-2">
-                    <FormLabel className={createFormLabelClass}>Course Description</FormLabel>
+                    <FormLabel className={createFormLabelGlassClass}>Course Description</FormLabel>
                     <FormControl>
                       <Textarea
                         placeholder="Provide a detailed description of the course"
                         rows={4}
-                        className={createFormControlClass + " h-auto min-h-[100px] resize-none py-2.5"}
+                        className={createFormControlGlassClass + " h-auto min-h-[100px] resize-none py-2.5"}
                         disabled={isSubmitting}
                         {...field}
                       />
@@ -1225,18 +1229,18 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                 name="category"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className={createFormLabelClass}>Category</FormLabel>
+                    <FormLabel className={createFormLabelGlassClass}>Category</FormLabel>
                     <Select
                       onValueChange={field.onChange}
                       value={field.value}
                       disabled={isSubmitting}
                     >
                       <FormControl>
-                        <SelectTrigger className={createFormControlClass}>
+                        <SelectTrigger className={createFormControlGlassClass}>
                           <SelectValue placeholder="Select a category" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent className={glassSelectContentClass}>
                         {categories.map((category) => (
                           <SelectItem key={category} value={category}>
                             {category}
@@ -1254,18 +1258,18 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                 name="difficulty"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className={createFormLabelClass}>Difficulty Level</FormLabel>
+                    <FormLabel className={createFormLabelGlassClass}>Difficulty Level</FormLabel>
                     <Select
                       onValueChange={field.onChange}
                       value={field.value}
                       disabled={isSubmitting}
                     >
                       <FormControl>
-                        <SelectTrigger className={createFormControlClass}>
+                        <SelectTrigger className={createFormControlGlassClass}>
                           <SelectValue placeholder="Select difficulty" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent className={glassSelectContentClass}>
                         {difficulties.map((difficulty) => (
                           <SelectItem key={difficulty} value={difficulty}>
                             <div className="flex items-center gap-2">
@@ -1295,7 +1299,7 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                 name="duration"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className={createFormLabelClass}>
+                    <FormLabel className={createFormLabelGlassClass}>
                       <span className="inline-flex items-center gap-2">
                         <Clock className="h-4 w-4 text-[#A0AEC0]" />
                         Duration (weeks)
@@ -1306,7 +1310,7 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                         type="number"
                         min={1}
                         max={52}
-                        className={createFormControlClass}
+                        className={createFormControlGlassClass}
                         disabled={isSubmitting}
                         {...field}
                       />
@@ -1321,7 +1325,7 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                 name="instructorId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className={createFormLabelClass}>
+                    <FormLabel className={createFormLabelGlassClass}>
                       <span className="inline-flex items-center gap-2">
                         <UserIcon className="h-4 w-4 text-[#A0AEC0]" />
                         Instructor
@@ -1335,11 +1339,11 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                       disabled={isSubmitting}
                     >
                       <FormControl>
-                        <SelectTrigger className={createFormControlClass}>
+                        <SelectTrigger className={createFormControlGlassClass}>
                           <SelectValue placeholder="Select instructor" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent className={glassSelectContentClass}>
                         {instructors.map((instructor) => (
                           <SelectItem key={instructor.id} value={String(instructor.id)}>
                             {instructor.name}
@@ -1356,7 +1360,7 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                 control={form.control}
                 name="isEnrollmentRequired"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-xl border border-border bg-white p-4 sm:col-span-2">
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-xl border border-white/10 bg-white/5 p-4 sm:col-span-2">
                     <FormControl>
                       <Checkbox
                         checked={field.value}
@@ -1365,7 +1369,7 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
-                      <FormLabel className={createFormLabelClass}>
+                      <FormLabel className={createFormLabelGlassClass}>
                         Enrollment Required
                       </FormLabel>
                       <p className="text-xs text-muted-foreground">
@@ -1379,85 +1383,89 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
           </FormSection>
 
           {/* Course Content - Modules and Lessons */}
-          <FormSection title="Course content" description="Modules and lessons for this course">
+          <FormSection tone="glass" title="Course content" description="Modules and lessons for this course">
               <div className="mb-4 flex justify-end">
-                <Button type="button" variant="outline" className="gap-2 rounded-xl" onClick={addModule}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="btn-violet h-10 gap-2 rounded-xl border-0 px-3.5"
+                  onClick={addModule}
+                >
                   <Plus className="h-4 w-4" />
                   Add Module
                 </Button>
               </div>
               
               {modules.map((module) => (
-                <div key={module.id} className="mb-4 border border-gray-200 rounded-md overflow-hidden">
+                <div key={module.id} className="mb-3 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
                   {editingModuleId === module.id ? (
-                    <div className="bg-gray-50 p-3">
+                    <div className="p-3">
                       <div className="flex flex-col space-y-3">
                         <Input
                           value={editModuleTitle}
                           onChange={(e) => setEditModuleTitle(e.target.value)}
-                          placeholder="Module Title"
-                          className="w-full"
+                          placeholder="Module title"
+                          className={createFormControlGlassClass}
                         />
                         <Textarea
                           value={editModuleDescription}
                           onChange={(e) => setEditModuleDescription(e.target.value)}
-                          placeholder="Module Description (optional)"
+                          placeholder="Module description (optional)"
                           rows={2}
-                          className="w-full resize-none"
+                          className={createFormControlGlassClass + " h-auto min-h-[72px] resize-none py-2.5"}
                         />
-                        <div className="flex justify-end space-x-2">
-                          <Button type="button" variant="outline" size="sm" onClick={cancelModuleEdit}>
+                        <div className="flex justify-end gap-2">
+                          <Button type="button" variant="ghost" size="sm" className="rounded-xl border border-white/10 bg-white/5 text-[#F4F4F8]" onClick={cancelModuleEdit}>
                             Cancel
                           </Button>
-                          <Button type="button" variant="default" size="sm" onClick={saveModuleEdit} disabled={isSavingModule}>
-                            {isSavingModule ? (
-                              <>
-                                <span className="animate-spin mr-1">⧗</span>
-                                Saving...
-                              </>
-                            ) : "Save"}
+                          <Button type="button" variant="ghost" size="sm" className="btn-violet rounded-xl border-0" onClick={saveModuleEdit} disabled={isSavingModule}>
+                            {isSavingModule ? "Saving..." : "Save"}
                           </Button>
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-gray-50 p-3 flex justify-between items-center">
-                      <div className="flex items-center">
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          size="sm" 
-                          className="p-1 mr-2"
+                    <div className="flex items-center justify-between gap-2 px-2 py-2">
+                      <div className="flex min-w-0 items-center">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="mr-1 h-8 w-8 p-0 text-[#C4B5FD] hover:bg-white/10"
                           onClick={() => toggleModule(module.id)}
                         >
                           {module.isOpen ? (
-                            <ChevronDown className="h-5 w-5 text-gray-600" />
+                            <ChevronDown className="h-4 w-4" />
                           ) : (
-                            <ChevronRight className="h-5 w-5 text-gray-600" />
+                            <ChevronRight className="h-4 w-4" />
                           )}
                         </Button>
-                        <div>
-                          <h5 className="font-medium">{module.title}</h5>
-                          {module.description && (
-                            <p className="text-xs text-gray-500">{module.description}</p>
+                        <div className="min-w-0">
+                          <h5 className="truncate text-sm font-semibold text-[#F4F4F8]">{module.title}</h5>
+                          {module.description ? (
+                            <p className="truncate text-xs text-[#8E8EA0]">{module.description}</p>
+                          ) : (
+                            <p className="text-xs text-[#8E8EA0]">
+                              {module.lessons?.length || 0} lessons
+                            </p>
                           )}
                         </div>
                       </div>
-                      <div className="flex space-x-2">
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          size="sm" 
-                          className="p-1 text-gray-600"
+                      <div className="flex shrink-0">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-[#C4B5FD] hover:bg-white/10"
                           onClick={() => startEditingModule(module.id)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          size="sm" 
-                          className="p-1 text-gray-600 hover:text-red-500"
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-rose-300 hover:bg-rose-400/15"
                           onClick={() => deleteModule(module.id)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -1470,24 +1478,24 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                     <div className="p-4">
                       <div className="space-y-3">
                         {module.lessons?.map((lesson) => (
-                          <div key={lesson.id} className="bg-white border border-gray-200 rounded-md">
+                          <div key={lesson.id} className="rounded-xl border border-white/10 bg-[#101016]">
                             {editingLessonIds && 
                              editingLessonIds.moduleId === module.id && 
                              editingLessonIds.lessonId === lesson.id ? (
                               <div className="p-3">
                                 <div className="flex flex-col space-y-3">
-                                  <div className="flex items-center">
+                                  <div className="flex items-center gap-2">
                                     {getLessonIcon(lesson.contentType)}
                                     <Input
                                       value={editLessonTitle}
                                       onChange={(e) => setEditLessonTitle(e.target.value)}
-                                      placeholder="Lesson Title"
-                                      className="flex-1"
+                                      placeholder="Lesson title"
+                                      className={createFormControlGlassClass + " flex-1"}
                                     />
                                   </div>
                                   
                                   {lesson.contentType === 'quiz' ? (
-                                    <div className="border rounded-md p-4 bg-gray-50">
+                                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
                                       <h4 className="font-medium mb-3">Quiz Questions</h4>
 
                                       <div className="grid gap-3 sm:grid-cols-2 mb-4">
@@ -1497,8 +1505,8 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                                           className={
                                             "rounded-xl border p-3 text-left transition-colors " +
                                             (quizBuilderMode === "manual"
-                                              ? "border-primary bg-primary/5"
-                                              : "border-border bg-white hover:bg-muted/40")
+                                              ? "border-[#8B5CF6] bg-[#8B5CF6]/15 text-[#F4F4F8]"
+                                              : "border-white/10 bg-white/5 text-[#F4F4F8] hover:bg-white/10")
                                           }
                                         >
                                           <p className="text-sm font-semibold flex items-center gap-2">
@@ -1514,8 +1522,8 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                                           className={
                                             "rounded-xl border p-3 text-left transition-colors " +
                                             (quizBuilderMode === "upload"
-                                              ? "border-primary bg-primary/5"
-                                              : "border-border bg-white hover:bg-muted/40")
+                                              ? "border-[#8B5CF6] bg-[#8B5CF6]/15 text-[#F4F4F8]"
+                                              : "border-white/10 bg-white/5 text-[#F4F4F8] hover:bg-white/10")
                                           }
                                         >
                                           <p className="text-sm font-semibold flex items-center gap-2">
@@ -1528,7 +1536,7 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                                       </div>
 
                                       {quizBuilderMode === "upload" && (
-                                        <div className="mb-4 space-y-3 rounded-xl border border-dashed border-border bg-white p-4">
+                                        <div className="mb-4 space-y-3 rounded-xl border border-dashed border-white/15 bg-white/5 p-4">
                                           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                             <div>
                                               <p className="text-sm font-semibold">
@@ -1613,7 +1621,7 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                                         <div className="mb-4 space-y-3">
                                           <h5 className="text-sm font-medium">Existing Questions</h5>
                                           {quizQuestions.map(question => (
-                                            <div key={question.id} className="bg-white p-3 rounded border">
+                                            <div key={question.id} className="rounded-xl border border-white/10 bg-[#101016] p-3">
                                               <div className="flex justify-between items-start">
                                                 <div>
                                                   <p className="font-medium">{question.text}</p>
@@ -1657,7 +1665,7 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                                               value={currentQuestion}
                                               onChange={(e) => setCurrentQuestion(e.target.value)}
                                               placeholder="Enter your question"
-                                              className="mt-1"
+                                              className={createFormControlGlassClass + " mt-1"}
                                             />
                                           </div>
                                           
@@ -1674,7 +1682,7 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                                                   value={option.text}
                                                   onChange={(e) => updateOptionText(option.id, e.target.value)}
                                                   placeholder={`Option ${option.id}`}
-                                                  className="flex-1"
+                                                  className={createFormControlGlassClass + " flex-1"}
                                                 />
                                               </div>
                                             ))}
@@ -1683,12 +1691,12 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                                             </p>
                                           </div>
                                           
-                                          <Button 
-                                            type="button" 
+                                          <Button
+                                            type="button"
                                             onClick={addQuizQuestion}
-                                            variant="outline" 
+                                            variant="ghost"
                                             size="sm"
-                                            className="mt-2"
+                                            className="btn-violet mt-2 rounded-xl border-0"
                                           >
                                             <Plus className="h-4 w-4 mr-1" />
                                             Add Question
@@ -1701,48 +1709,62 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                                     <Textarea
                                       value={editLessonContent}
                                       onChange={(e) => setEditLessonContent(e.target.value)}
-                                      placeholder="Lesson content"
+                                      placeholder={
+                                        lesson.contentType === "video"
+                                          ? "Video URL"
+                                          : lesson.contentType === "pdf"
+                                            ? "PDF URL or notes"
+                                            : "Lesson content"
+                                      }
                                       rows={4}
-                                      className="w-full resize-none"
+                                      className={createFormControlGlassClass + " h-auto min-h-[96px] w-full resize-none py-2.5"}
                                     />
                                   )}
                                   
-                                  <div className="flex justify-end space-x-2">
-                                    <Button type="button" variant="outline" size="sm" onClick={cancelLessonEdit}>
+                                  <div className="flex justify-end gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="rounded-xl border border-white/10 bg-white/5 text-[#F4F4F8] hover:bg-white/10"
+                                      onClick={cancelLessonEdit}
+                                    >
                                       Cancel
                                     </Button>
-                                    <Button type="button" variant="default" size="sm" onClick={saveLessonEdit} disabled={isSavingLesson}>
-                                      {isSavingLesson ? (
-                                        <>
-                                          <span className="animate-spin mr-1">⧗</span>
-                                          Saving...
-                                        </>
-                                      ) : "Save"}
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="btn-violet rounded-xl border-0"
+                                      onClick={saveLessonEdit}
+                                      disabled={isSavingLesson}
+                                    >
+                                      {isSavingLesson ? "Saving..." : "Save"}
                                     </Button>
                                   </div>
                                 </div>
                               </div>
                             ) : (
-                              <div className="flex items-center justify-between p-2">
-                                <div className="flex items-center">
+                              <div className="flex items-center justify-between gap-2 p-2.5">
+                                <div className="flex min-w-0 items-center gap-2 text-sm text-[#F4F4F8]">
                                   {getLessonIcon(lesson.contentType)}
-                                  <span>{lesson.title}</span>
+                                  <span className="truncate">{lesson.title}</span>
                                 </div>
-                                <div className="flex space-x-2">
-                                  <Button 
-                                    type="button" 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="p-1 text-gray-600"
+                                <div className="flex shrink-0">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 text-[#C4B5FD] hover:bg-white/10"
                                     onClick={() => startEditingLesson(module.id, lesson.id)}
                                   >
                                     <Edit className="h-4 w-4" />
                                   </Button>
-                                  <Button 
-                                    type="button" 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="p-1 text-gray-600 hover:text-red-500"
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 text-rose-300 hover:bg-rose-400/15"
                                     onClick={() => deleteLesson(module.id, lesson.id)}
                                   >
                                     <Trash2 className="h-4 w-4" />
@@ -1754,42 +1776,42 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                         ))}
                       </div>
                       
-                      <div className="flex items-center space-x-2 mt-3">
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          className="text-sm" 
-                          onClick={() => addLesson(module.id, 'text')}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="h-9 gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-[#F4F4F8] hover:bg-white/10"
+                          onClick={() => addLesson(module.id, "text")}
                         >
-                          <FileText className="h-4 w-4 mr-1 text-green-500" />
-                          Add Text
+                          <FileText className="h-4 w-4 text-emerald-300" />
+                          Add text
                         </Button>
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          className="text-sm" 
-                          onClick={() => addLesson(module.id, 'video')}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="h-9 gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-[#F4F4F8] hover:bg-white/10"
+                          onClick={() => addLesson(module.id, "video")}
                         >
-                          <Video className="h-4 w-4 mr-1 text-blue-500" />
-                          Add Video
+                          <Video className="h-4 w-4 text-sky-300" />
+                          Add video
                         </Button>
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          className="text-sm" 
-                          onClick={() => addLesson(module.id, 'pdf')}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="h-9 gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-[#F4F4F8] hover:bg-white/10"
+                          onClick={() => addLesson(module.id, "pdf")}
                         >
-                          <FileText className="h-4 w-4 mr-1 text-red-500" />
+                          <FileText className="h-4 w-4 text-rose-300" />
                           Add PDF
                         </Button>
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          className="text-sm" 
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="h-9 gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-[#F4F4F8] hover:bg-white/10"
                           onClick={() => setQuizAddModuleId(module.id)}
                         >
-                          <ClipboardList className="h-4 w-4 mr-1 text-teal-600" />
-                          Add Quiz
+                          <ClipboardList className="h-4 w-4 text-[#C4B5FD]" />
+                          Add quiz
                         </Button>
                       </div>
                     </div>
@@ -1798,21 +1820,21 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
               ))}
               
               {modules.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <BookOpen className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                <div className="py-8 text-center text-[#8E8EA0]">
+                  <BookOpen className="mx-auto mb-2 h-12 w-12 text-[#3A3A48]" />
                   <p>No modules added yet. Click "Add Module" to get started.</p>
                 </div>
               )}
           </FormSection>
 
           {/* Course Thumbnail */}
-          <FormSection title="Course thumbnail" description="Cover image for the course card">
+          <FormSection tone="glass" title="Course thumbnail" description="Cover image for the course card">
               {thumbnailPreview ? (
                 <div className="relative">
                   <img
                     src={formatThumbnailUrl(thumbnailPreview)}
                     alt="Course thumbnail preview"
-                    className="h-48 w-full rounded-xl border border-border object-cover"
+                    className="h-48 w-full rounded-xl border border-white/10 object-cover"
                   />
                   <Button
                     type="button"
@@ -1826,19 +1848,23 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
                 </div>
               ) : (
                 <div
-                  className="cursor-pointer rounded-xl border-2 border-dashed border-border bg-white p-8 text-center transition-colors hover:border-[#0F766E]"
+                  className="cursor-pointer rounded-xl border-2 border-dashed border-white/15 bg-white/5 p-8 text-center transition-colors hover:border-[#8B5CF6]"
                   onDragOver={handleDragOver}
                   onDrop={handleDrop}
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <Upload className="mx-auto mb-4 h-12 w-12 text-[#A0AEC0]" />
-                  <p className="mb-2 text-lg font-medium text-[#2D3748]">
+                  <p className="mb-2 text-lg font-medium text-[#F4F4F8]">
                     Drag & drop your course image here
                   </p>
                   <p className="mb-4 text-sm text-muted-foreground">
                     Recommended size: 800x450 pixels • Max 5MB
                   </p>
-                  <Button type="button" variant="outline" className="gap-2 rounded-xl">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="pointer-events-none h-10 gap-2 rounded-xl border border-white/10 bg-white/10 text-[#F4F4F8]"
+                  >
                     <Upload className="h-4 w-4" />
                     Choose File
                   </Button>
@@ -1890,7 +1916,7 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
             <button
               type="button"
               onClick={handleQuizAddManual}
-              className="rounded-xl border border-border bg-white p-4 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors"
+              className="rounded-xl border border-white/10 bg-white/5 p-4 text-left text-[#F4F4F8] transition-colors hover:border-[#8B5CF6]/50"
             >
               <PenLine className="h-5 w-5 text-primary mb-2" />
               <p className="text-sm font-semibold">Manual</p>
@@ -1902,7 +1928,7 @@ export default function CourseEditor({ open, onOpenChange, course }: CourseEdito
               type="button"
               onClick={handleQuizAddUploadClick}
               disabled={isParsingQuizDoc}
-              className="rounded-xl border border-border bg-white p-4 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors disabled:opacity-60"
+              className="rounded-xl border border-white/10 bg-white/5 p-4 text-left text-[#F4F4F8] transition-colors hover:border-[#8B5CF6]/50 disabled:opacity-60"
             >
               <Upload className="h-5 w-5 text-primary mb-2" />
               <p className="text-sm font-semibold">Upload document</p>

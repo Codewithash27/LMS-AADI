@@ -1,6 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import Header from "@/components/layout/header";
-import ListToolbar from "@/components/layout/list-toolbar";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import CourseEditor from "@/components/courses/course-editor";
 import { Button } from "@/components/ui/button";
@@ -19,6 +17,7 @@ import {
   List,
   Clock,
   UserPlus,
+  Search,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -55,6 +54,7 @@ import DataTable from "@/components/primitives/DataTable";
 import { useClientPagination } from "@/hooks/use-client-pagination";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { getCourseThumbnailSrc } from "@/lib/course-thumbnail";
+import { Input } from "@/components/ui/input";
 
 export default function AdminCourses() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -334,15 +334,15 @@ export default function AdminCourses() {
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty?.toLowerCase()) {
       case "beginner":
-        return "bg-green-100 text-green-800 border-green-200";
+        return "border-emerald-400/20 bg-emerald-400/15 text-emerald-300";
       case "intermediate":
-        return "bg-blue-100 text-blue-800 border-blue-200";
+        return "border-sky-400/20 bg-sky-400/15 text-sky-300";
       case "advanced":
-        return "bg-teal-100 text-teal-800 border-teal-200";
+        return "border-violet-400/25 bg-violet-400/15 text-violet-200";
       case "expert":
-        return "bg-red-100 text-red-800 border-red-200";
+        return "border-rose-400/25 bg-rose-400/15 text-rose-300";
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
+        return "border-white/10 bg-white/10 text-[#D6D6E2]";
     }
   };
 
@@ -387,90 +387,80 @@ export default function AdminCourses() {
 
   return (
     <DashboardLayout>
-      <Header
-        title="Courses"
-        actions={
-          <ListToolbar
-            searchValue={searchTerm}
-            onSearchChange={setSearchTerm}
-            searchPlaceholder="Search courses..."
-            filters={
-              <>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="h-10 w-[130px] rounded-xl border-border bg-white shadow-sm">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="upcoming">Upcoming</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="draft">Draft</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={levelFilter} onValueChange={setLevelFilter}>
-                  <SelectTrigger className="h-10 w-[130px] rounded-xl border-border bg-white shadow-sm">
-                    <SelectValue placeholder="Level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Levels</SelectItem>
-                    <SelectItem value="beginner">Beginner</SelectItem>
-                    <SelectItem value="intermediate">Intermediate</SelectItem>
-                    <SelectItem value="advanced">Advanced</SelectItem>
-                    <SelectItem value="expert">Expert</SelectItem>
-                  </SelectContent>
-                </Select>
-              </>
-            }
-            extras={
-              <div className="inline-flex rounded-xl border border-border bg-white p-0.5 shadow-sm">
-                <ActionTooltip label="Grid view">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className={cn(
-                      "h-9 w-9 rounded-lg p-0",
-                      view === "grid" && "bg-brand-turquoise/15 text-brand-turquoise"
-                    )}
-                    onClick={() => setView("grid")}
-                    aria-label="Grid view"
-                  >
-                    <LayoutGrid className="h-4 w-4" />
-                  </Button>
-                </ActionTooltip>
-                <ActionTooltip label="List view">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className={cn(
-                      "h-9 w-9 rounded-lg p-0",
-                      view === "list" && "bg-brand-turquoise/15 text-brand-turquoise"
-                    )}
-                    onClick={() => setView("list")}
-                    aria-label="List view"
-                  >
-                    <List className="h-4 w-4" />
-                  </Button>
-                </ActionTooltip>
-              </div>
-            }
-            action={
-              <ActionTooltip label="Create course">
-                <Button
-                  type="button"
-                  onClick={handleCreateCourse}
-                  className="h-11 w-11 shrink-0 rounded-xl p-0"
-                  aria-label="Create course"
-                >
-                  <Plus className="h-5 w-5" />
-                </Button>
-              </ActionTooltip>
-            }
+      <div className="mb-3 flex flex-col gap-2 rounded-[20px] border border-white/10 bg-[rgba(14,14,22,0.55)] p-2.5 shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8E8EA0]" />
+          <Input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search courses"
+            className="h-10 rounded-xl border-white/10 bg-white/5 pl-9 text-[#F4F4F8] placeholder:text-[#8E8EA0] focus-visible:ring-[#8B5CF6]"
           />
-        }
-      />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-10 w-[calc(50%-4px)] rounded-xl border-white/10 bg-white/5 text-[#F4F4F8] sm:w-[140px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent className="border-white/10 bg-[#14141c] text-[#F4F4F8]">
+              <SelectItem value="all">All status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="upcoming">Upcoming</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={levelFilter} onValueChange={setLevelFilter}>
+            <SelectTrigger className="h-10 w-[calc(50%-4px)] rounded-xl border-white/10 bg-white/5 text-[#F4F4F8] sm:w-[150px]">
+              <SelectValue placeholder="Level" />
+            </SelectTrigger>
+            <SelectContent className="border-white/10 bg-[#14141c] text-[#F4F4F8]">
+              <SelectItem value="all">All levels</SelectItem>
+              <SelectItem value="beginner">Beginner</SelectItem>
+              <SelectItem value="intermediate">Intermediate</SelectItem>
+              <SelectItem value="advanced">Advanced</SelectItem>
+              <SelectItem value="expert">Expert</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-0.5">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className={cn(
+                "h-9 w-9 rounded-lg p-0 text-[#8E8EA0] hover:bg-white/10 hover:text-white",
+                view === "grid" && "bg-[#8B5CF6] text-white hover:bg-[#8B5CF6] hover:text-white"
+              )}
+              onClick={() => setView("grid")}
+              aria-label="Grid view"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className={cn(
+                "h-9 w-9 rounded-lg p-0 text-[#8E8EA0] hover:bg-white/10 hover:text-white",
+                view === "list" && "bg-[#8B5CF6] text-white hover:bg-[#8B5CF6] hover:text-white"
+              )}
+              onClick={() => setView("list")}
+              aria-label="List view"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleCreateCourse}
+            className="btn-violet h-10 flex-1 gap-2 rounded-xl border-0 px-3.5 sm:flex-none"
+          >
+            <Plus className="h-4 w-4" />
+            New course
+          </Button>
+        </div>
+      </div>
 
       {/* Content */}
       {isLoadingCourses ? (
@@ -492,11 +482,11 @@ export default function AdminCourses() {
           ))}
         </div>
       ) : filteredCourses.length === 0 ? (
-        <Card>
+        <Card className="rounded-[20px] border-white/10 bg-[rgba(14,14,22,0.55)] text-[#F4F4F8]">
           <CardContent className="px-6 py-14 text-center">
-            <BookOpen className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
-            <h3 className="mb-1 text-lg font-semibold text-foreground">No courses found</h3>
-            <p className="mb-4 text-[15px] text-muted-foreground">
+            <BookOpen className="mx-auto mb-3 h-12 w-12 text-[#8E8EA0]" />
+            <h3 className="mb-1 text-lg font-semibold">No courses found</h3>
+            <p className="mb-4 text-[15px] text-[#8E8EA0]">
               {searchTerm
                 ? "No courses match your search."
                 : "Get started by creating your first course."}
@@ -508,57 +498,53 @@ export default function AdminCourses() {
           </CardContent>
         </Card>
       ) : view === "grid" ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 items-stretch gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filteredCourses.map((course: any) => {
             const src = thumbSrc(course);
             const enrollmentCount = getEnrollmentCount(course);
             return (
               <Card
                 key={course.id}
-                className="flex flex-col overflow-hidden transition-shadow hover:shadow-[0_12px_28px_rgba(0,0,0,0.06)]"
+                className="flex h-full flex-col overflow-hidden rounded-[20px] border-white/10 bg-[rgba(14,14,22,0.55)] text-[#F4F4F8]"
               >
-                <div className="relative h-36 bg-gradient-to-br from-brand-turquoise/15 to-brand-blue/10">
+                <div className="relative h-28 shrink-0 overflow-hidden bg-white/5">
                   {src ? (
-                    <img
-                      src={src}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
+                    <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center">
-                      <BookOpen className="h-10 w-10 text-brand-turquoise/70" />
+                      <BookOpen className="h-8 w-8 text-[#A78BFA]" />
                     </div>
                   )}
                   <div className="absolute left-3 top-3">
                     <Badge
                       className={cn(
-                        "border px-2 py-0.5 text-xs font-medium",
+                        "border px-2 py-0.5 text-[11px] font-semibold",
                         getDifficultyColor(course.difficulty)
                       )}
                     >
-                      {course.difficulty || "All Levels"}
+                      {course.difficulty || "All levels"}
                     </Badge>
                   </div>
                   <div className="absolute right-2 top-2">
-                    <div className="rounded-lg bg-white/90 shadow-sm">
+                    <div className="rounded-lg border border-white/10 bg-[#14141c]/90">
                       <CourseActionsMenu course={course} />
                     </div>
                   </div>
                 </div>
 
-                <CardContent className="flex flex-1 flex-col gap-2 p-4">
+                <CardContent className="flex min-h-0 flex-1 flex-col gap-2 p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="line-clamp-2 text-[17px] font-semibold leading-snug text-foreground">
+                    <h3 className="line-clamp-2 min-w-0 text-[16px] font-semibold leading-snug">
                       {course.title}
                     </h3>
-                    <Badge variant="outline" className="shrink-0 text-xs">
+                    <Badge className="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300">
                       {course.status === "active" || !course.status ? "Active" : course.status}
                     </Badge>
                   </div>
-                  <p className="line-clamp-2 text-[15px] text-muted-foreground">
+                  <p className="line-clamp-2 text-[13px] text-[#8E8EA0]">
                     {course.description || "No description"}
                   </p>
-                  <div className="mt-auto flex flex-wrap gap-3 pt-2 text-sm text-muted-foreground">
+                  <div className="mt-auto flex flex-wrap gap-x-3 gap-y-1 pt-1 text-[12px] text-[#8E8EA0]">
                     <span className="inline-flex items-center gap-1">
                       <Users className="h-3.5 w-3.5" />
                       {enrollmentCount} enrolled
@@ -571,11 +557,11 @@ export default function AdminCourses() {
                   </div>
                 </CardContent>
 
-                <CardFooter className="gap-2 border-t border-border p-3">
+                <CardFooter className="gap-2 border-t border-white/10 p-3">
                   <Button
                     size="sm"
                     variant="outline"
-                    className="flex-1 gap-1.5"
+                    className="flex-1 gap-1.5 border-white/10 bg-white/5 text-[#F4F4F8] hover:bg-white/10"
                     onClick={() => handleEditCourse(course)}
                   >
                     <Edit className="h-3.5 w-3.5" />
@@ -584,7 +570,7 @@ export default function AdminCourses() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="flex-1 gap-1.5"
+                    className="flex-1 gap-1.5 border-white/10 bg-white/5 text-[#F4F4F8] hover:bg-white/10"
                     onClick={() => openAssignDialog(course)}
                   >
                     <UserPlus className="h-3.5 w-3.5" />
@@ -593,7 +579,7 @@ export default function AdminCourses() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="flex-1 gap-1.5"
+                    className="flex-1 gap-1.5 border-white/10 bg-white/5 text-[#F4F4F8] hover:bg-white/10"
                     onClick={() => {
                       window.location.href = `/admin/courses/${course.id}/progress`;
                     }}
@@ -608,7 +594,8 @@ export default function AdminCourses() {
         </div>
       ) : (
         <DataTable
-          title="Course Directory"
+          variant="glass"
+          title="Course directory"
           columns={[
             { key: "course", label: "Course" },
             { key: "level", label: "Level" },
@@ -629,21 +616,21 @@ export default function AdminCourses() {
             const src = thumbSrc(course);
             const enrollmentCount = getEnrollmentCount(course);
             return (
-              <TableRow key={course.id} className="hover:bg-muted/70">
+              <TableRow key={course.id} className="border-white/10 hover:bg-white/[0.04]">
                 <TableCell className="py-3.5 pl-5">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/15">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#8B5CF6]/20">
                       {src ? (
                         <img src={src} alt="" className="h-full w-full object-cover" />
                       ) : (
-                        <BookOpen className="h-5 w-5 text-primary" />
+                        <BookOpen className="h-5 w-5 text-[#C4B5FD]" />
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-[15px] font-semibold text-[#2D3748]">
+                      <p className="truncate text-[15px] font-semibold text-[#F4F4F8]">
                         {course.title}
                       </p>
-                      <p className="line-clamp-1 text-xs text-muted-foreground">
+                      <p className="line-clamp-1 text-xs text-[#8E8EA0]">
                         {course.description || "No description"}
                       </p>
                     </div>
@@ -659,28 +646,28 @@ export default function AdminCourses() {
                     {course.difficulty || "All Levels"}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-[15px] text-[#2D3748]/90">
+                <TableCell className="text-[15px] text-[#D6D6E2]">
                   {course.category || "General"}
                 </TableCell>
-                <TableCell className="text-[15px] text-[#2D3748]/90">
+                <TableCell className="text-[15px] text-[#D6D6E2]">
                   {course.duration || "8"} weeks
                 </TableCell>
-                <TableCell className="text-[15px] text-[#2D3748]/90">
+                <TableCell className="text-[15px] text-[#D6D6E2]">
                   {enrollmentCount}
                 </TableCell>
                 <TableCell>
-                  <Badge className="rounded-full border border-green-200 bg-green-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-green-800">
+                  <Badge className="rounded-full border border-emerald-400/20 bg-emerald-400/15 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-300">
                     {course.status === "active" || !course.status ? "Active" : course.status}
                   </Badge>
                 </TableCell>
-                <TableCell className="pr-5 text-right">
-                  <div className="flex items-center justify-end gap-1">
+                <TableCell className="pr-4 text-right">
+                  <div className="inline-flex items-center rounded-xl border border-white/10 bg-white/[0.04] p-0.5">
                     <ActionTooltip label="Edit course">
                       <Button
                         type="button"
                         size="sm"
                         variant="ghost"
-                        className="h-9 w-9 p-0 text-primary hover:bg-primary/10"
+                        className="h-8 w-8 rounded-lg p-0 text-[#C4B5FD] hover:bg-white/10 hover:text-white"
                         aria-label="Edit course"
                         onClick={() => handleEditCourse(course)}
                       >
@@ -692,7 +679,7 @@ export default function AdminCourses() {
                         type="button"
                         size="sm"
                         variant="ghost"
-                        className="h-9 w-9 p-0 text-primary hover:bg-primary/10"
+                        className="h-8 w-8 rounded-lg p-0 text-[#C4B5FD] hover:bg-white/10 hover:text-white"
                         aria-label="Assign to student"
                         onClick={() => openAssignDialog(course)}
                       >
@@ -704,7 +691,7 @@ export default function AdminCourses() {
                         type="button"
                         size="sm"
                         variant="ghost"
-                        className="h-9 w-9 p-0 text-primary/80 hover:bg-primary/10"
+                        className="h-8 w-8 rounded-lg p-0 text-[#C4B5FD] hover:bg-white/10 hover:text-white"
                         aria-label="View progress"
                         onClick={() => {
                           window.location.href = `/admin/courses/${course.id}/progress`;
@@ -718,7 +705,7 @@ export default function AdminCourses() {
                         type="button"
                         size="sm"
                         variant="ghost"
-                        className="h-9 w-9 p-0 text-[#d32f2f] hover:bg-[#d32f2f]/10"
+                        className="h-8 w-8 rounded-lg p-0 text-rose-300 hover:bg-rose-400/15 hover:text-rose-200"
                         aria-label="Delete course"
                         onClick={() => handleDeleteCourse(course)}
                       >
@@ -749,10 +736,12 @@ export default function AdminCourses() {
             ? `Select students for "${selectedCourse.title}". Batch members stay locked.`
             : "Select students to enroll"
         }
-        icon={<UserPlus className="h-7 w-7 text-white" />}
+        icon={<UserPlus className="h-5 w-5 text-white" />}
         maxWidth="max-w-lg"
+        tone="glass"
         footer={
           <CreateFormFooter
+            tone="glass"
             onCancel={() => setIsAssignDialogOpen(false)}
             submitLabel="Save Enrollments"
             pendingLabel="Saving..."
@@ -764,7 +753,7 @@ export default function AdminCourses() {
         }
       >
         <div className="space-y-3">
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <div className="flex items-center justify-between text-sm text-[#8E8EA0]">
             <span>
               {selectedStudentIds.length} of {students.length} selected
             </span>
@@ -773,17 +762,17 @@ export default function AdminCourses() {
             </span>
           </div>
 
-          <div className="max-h-[min(320px,40vh)] overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-white">
+          <div className="max-h-[min(320px,40vh)] overflow-y-auto overflow-x-hidden rounded-xl border border-white/10 bg-white/[0.03]">
             {isLoadingEnrollments || isLoadingBatchLocks ? (
               <div className="flex items-center justify-center py-10">
-                <div className="h-7 w-7 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#8B5CF6] border-t-transparent" />
               </div>
             ) : students.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+              <p className="px-4 py-8 text-center text-sm text-[#8E8EA0]">
                 No students available
               </p>
             ) : (
-              <ul className="divide-y divide-border/80">
+              <ul className="divide-y divide-white/10">
                 {students.map((student) => {
                   const checked = selectedStudentIds.includes(student.id);
                   const wasEnrolled = initialEnrolledIds.includes(student.id);
@@ -792,9 +781,9 @@ export default function AdminCourses() {
                     <li key={student.id}>
                       <label
                         className={cn(
-                          "flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/70",
-                          checked && "bg-primary/5",
-                          lockedByBatch && "cursor-not-allowed bg-muted/40"
+                          "flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.04]",
+                          checked && "bg-[#8B5CF6]/10",
+                          lockedByBatch && "cursor-not-allowed bg-white/[0.03]"
                         )}
                       >
                         <Checkbox
@@ -805,20 +794,20 @@ export default function AdminCourses() {
                           }
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[15px] font-medium text-[#2D3748]">
+                          <p className="truncate text-[15px] font-medium text-[#F4F4F8]">
                             {student.firstName} {student.lastName}
                           </p>
-                          <p className="truncate text-xs text-muted-foreground">
+                          <p className="truncate text-xs text-[#8E8EA0]">
                             {student.username}
                             {student.email ? ` · ${student.email}` : ""}
                           </p>
                         </div>
                         {lockedByBatch ? (
-                          <Badge className="shrink-0 rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
+                          <Badge className="shrink-0 rounded-full border border-amber-400/20 bg-amber-400/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-200">
                             Via batch
                           </Badge>
                         ) : wasEnrolled ? (
-                          <Badge className="shrink-0 rounded-full border border-green-200 bg-green-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-800">
+                          <Badge className="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300">
                             Enrolled
                           </Badge>
                         ) : null}
