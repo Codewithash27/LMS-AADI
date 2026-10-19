@@ -51,7 +51,7 @@ export default function PerformanceMetrics({
     <Card
       className={cn(
         "border border-white/20 bg-white/70 shadow-xl backdrop-blur-sm",
-        fillHeight && "flex h-full min-h-0 flex-col",
+        fillHeight && "flex h-full min-h-0 flex-col overflow-hidden",
         className
       )}
     >
@@ -68,7 +68,7 @@ export default function PerformanceMetrics({
       <CardContent
         className={cn(
           "flex flex-col px-4 pb-4 pt-1 sm:px-5",
-          fillHeight && "min-h-0 flex-1"
+          fillHeight && "min-h-0 flex-1 overflow-hidden"
         )}
       >
         {courses.length === 0 ? (
@@ -125,8 +125,7 @@ export default function PerformanceMetrics({
               variant="outline"
               size="sm"
               className={cn(
-                "group w-full rounded-xl border-gray-300 bg-white/50 text-sm font-medium text-gray-700",
-                fillHeight ? "mt-auto" : "mt-3"
+                "group mt-3 w-full shrink-0 rounded-xl border-gray-300 bg-white/50 text-sm font-medium text-gray-700"
               )}
               asChild
             >

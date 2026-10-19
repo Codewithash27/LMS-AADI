@@ -96,7 +96,7 @@ export default function RecentActivities({
     <Card
       className={cn(
         "border border-white/20 bg-white/70 shadow-xl backdrop-blur-sm",
-        fillHeight && "flex h-full min-h-0 flex-col",
+        fillHeight && "flex h-full min-h-0 flex-col overflow-hidden",
         className
       )}
     >
@@ -113,7 +113,7 @@ export default function RecentActivities({
       <CardContent
         className={cn(
           "px-4 pb-4 pt-1 sm:px-5",
-          fillHeight && "flex min-h-0 flex-1 flex-col"
+          fillHeight && "flex min-h-0 flex-1 flex-col overflow-hidden"
         )}
       >
         {activities.length === 0 ? (
@@ -158,7 +158,7 @@ export default function RecentActivities({
             <Button
               variant="ghost"
               size="sm"
-              className="group mt-2 w-full justify-between rounded-xl text-sm font-medium text-gray-700 hover:bg-white/50"
+              className="group mt-2 w-full shrink-0 justify-between rounded-xl text-sm font-medium text-gray-700 hover:bg-white/50"
               asChild
             >
               <a href={viewAllHref}>

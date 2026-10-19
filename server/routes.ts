@@ -2050,6 +2050,101 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
 
       const publishedExamCount = exams.filter((e) => e.acceptingResponses !== false).length;
       const closedExams = exams.filter((e) => e.acceptingResponses === false).length;
+      const batches = await storage.getBatchesByTenant(tenantId);
+      const activeBatches = batches.filter((batch) => batch.isActive !== false);
+      const mcqExams = exams.filter((exam) => exam.examType === "mcq");
+      const theoryExams = exams.filter((exam) => exam.examType !== "mcq");
+      const attempts = await storage.getAllExamAttemptsForAdmin(tenantId);
+      const pendingReviewRows = attempts.filter(
+        (attempt) =>
+          attempt.completedAt && !attempt.reviewedAt && attempt.exam?.examType !== "mcq"
+      );
+      const pendingReviews = pendingReviewRows.slice(0, 6).map((attempt) => ({
+        id: attempt.id,
+        studentName:
+          `${attempt.user?.firstName || ""} ${attempt.user?.lastName || ""}`.trim() ||
+          attempt.user?.username ||
+          "Student",
+        examTitle: attempt.exam?.title || "Exam",
+        completedAt: attempt.completedAt,
+      }));
+      const questionGroups = await Promise.all(
+        exams.map(async (exam) => ({
+          exam,
+          questions: await storage.getQuestionsByExam(exam.id),
+        }))
+      );
+      const mcqQuestions = questionGroups.reduce(
+        (sum, group) =>
+          sum +
+          group.questions.filter(
+            (question) => Array.isArray(question.options) && question.options.length > 0
+          ).length,
+        0
+      );
+      const openExams = questionGroups
+        .filter((group) => group.exam.acceptingResponses !== false)
+        .slice(0, 5)
+        .map((group) => ({
+          id: group.exam.id,
+          title: group.exam.title,
+          courseTitle: courses.find((course) => course.id === group.exam.courseId)?.title || "Course",
+          examType: group.exam.examType === "mcq" ? "MCQ" : "Theory",
+          questionCount: group.questions.length,
+        }));
+      const recentEnrollments = enrollmentsByCourse
+        .flatMap(({ course, enrollments }) =>
+          enrollments.map((enrollment) => {
+            const student = userById.get(enrollment.userId);
+            return {
+              id: enrollment.id,
+              studentName: student
+                ? `${student.firstName || ""} ${student.lastName || ""}`.trim() || student.username
+                : "Student",
+              courseTitle: course.title,
+              enrolledAt: enrollment.enrolledAt,
+              progress: enrollment.progress,
+            };
+          })
+        )
+        .sort(
+          (a, b) => new Date(b.enrolledAt as any).getTime() - new Date(a.enrolledAt as any).getTime()
+        )
+        .slice(0, 6);
+
+      const progressByUserCourse = new Map<string, number>();
+      for (const { course, enrollments } of enrollmentsByCourse) {
+        for (const enrollment of enrollments) {
+          progressByUserCourse.set(
+            `${enrollment.userId}:${course.id}`,
+            Number(enrollment.progress) || 0
+          );
+        }
+      }
+      const batchProgress = [];
+      for (const batch of activeBatches) {
+        const members = (await storage.getBatchEnrollmentsByBatch(batch.id)).filter(
+          (member) => member.status !== "dropped"
+        );
+        const courseIds = await storage.getBatchCourseIds(batch.id);
+        let sum = 0;
+        for (const member of members) {
+          if (courseIds.length === 0) continue;
+          const studentAvg =
+            courseIds.reduce(
+              (total, courseId) =>
+                total + (progressByUserCourse.get(`${member.userId}:${courseId}`) || 0),
+              0
+            ) / courseIds.length;
+          sum += studentAvg;
+        }
+        batchProgress.push({
+          id: batch.id,
+          name: batch.name,
+          percentage: members.length === 0 ? 0 : Math.round(sum / members.length),
+          enrolled: members.length,
+        });
+      }
 
       res.json({
         stats: {
@@ -2061,7 +2156,16 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
           totalEnrollments,
           avgCompletion,
           activityEvents: signalLogs.length,
+          activeBatches: activeBatches.length,
+          mcqExams: mcqExams.length,
+          theoryExams: theoryExams.length,
+          mcqQuestions,
+          pendingReviews: pendingReviewRows.length,
         },
+        pendingReviews,
+        recentEnrollments,
+        openExams,
+        batchProgress,
         coursePerformance,
         activitySeries: { weekly, monthly, yearly },
         weekChangePct,

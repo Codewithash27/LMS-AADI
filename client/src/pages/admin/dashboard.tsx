@@ -1,15 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import ActivityChart from "@/components/dashboard/activity-chart";
 import PerformanceMetrics from "@/components/dashboard/performance-metrics";
 import RecentActivities from "@/components/dashboard/recent-activities";
 import UpcomingExams from "@/components/dashboard/upcoming-exams";
 import { Card, CardContent } from "@/components/ui/card";
-import { Users, BookOpen, Calendar, Target, ClipboardList, BarChart3 } from "lucide-react";
+import { Users, BookOpen, Calendar, Target } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 
 type DashboardPayload = {
@@ -24,6 +23,7 @@ type DashboardPayload = {
     activityEvents: number;
   };
   coursePerformance: { id: number; name: string; percentage: number; enrolled: number }[];
+  batchProgress?: { id: number; name: string; percentage: number; enrolled: number }[];
   activitySeries: {
     weekly: { day: string; percentage: number; count: number; isCurrentDay?: boolean }[];
     monthly: { day: string; percentage: number; count: number }[];
@@ -49,11 +49,8 @@ type DashboardPayload = {
   }[];
 };
 
-type Timeframe = "weekly" | "monthly" | "yearly";
-
 export default function AdminDashboard() {
   const { user } = useAuth();
-  const [timeframe, setTimeframe] = useState<Timeframe>("weekly");
 
   const { data, isLoading } = useQuery<DashboardPayload>({
     queryKey: ["/api/admin/dashboard"],
@@ -72,14 +69,15 @@ export default function AdminDashboard() {
   }, [user]);
 
   const stats = data?.stats;
-  const chartData =
-    timeframe === "monthly"
-      ? data?.activitySeries?.monthly || []
-      : timeframe === "yearly"
-        ? data?.activitySeries?.yearly || []
-        : data?.activitySeries?.weekly || [];
-
-  const weekChange = data?.weekChangePct ?? 0;
+  const batchBars = (data?.batchProgress || []).map((batch) => ({
+    day: batch.name,
+    percentage: batch.percentage,
+    count: batch.enrolled,
+  }));
+  const avgBatch =
+    batchBars.length === 0
+      ? 0
+      : Math.round(batchBars.reduce((sum, batch) => sum + batch.percentage, 0) / batchBars.length);
   const courses = (data?.coursePerformance || []).map((c) => ({
     name: c.name,
     percentage: c.percentage,
@@ -117,7 +115,7 @@ export default function AdminDashboard() {
   return (
     <DashboardLayout>
       {/* Full width of main pane — no max-width island / side gaps */}
-      <div className="flex w-full min-w-0 flex-col gap-2.5 sm:gap-3">
+      <div className="dash-sync flex h-full min-h-0 w-full min-w-0 flex-col gap-2.5 sm:gap-3">
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
           {statItems.map((item) => (
             <Card key={item.label} className="border border-[#D4DEE3] bg-white shadow-sm">
@@ -135,18 +133,22 @@ export default function AdminDashboard() {
         </div>
 
         {/* Equal fixed heights — lists scroll inside, no staircase gap */}
-        <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-3 lg:gap-3">
-          <div className="min-w-0 h-[300px] lg:col-span-2 sm:h-[320px]">
+        <div className="grid min-h-[240px] flex-1 grid-cols-1 gap-2.5 lg:min-h-0 lg:grid-cols-3 lg:gap-3">
+          <div className="min-h-[220px] min-w-0 overflow-hidden lg:col-span-2 lg:h-full lg:min-h-0">
             <ActivityChart
-              data={chartData}
-              changePercentage={`${Math.abs(weekChange)}%`}
-              isPositiveChange={weekChange >= 0}
-              timeframe={timeframe}
-              onTimeframeChange={setTimeframe}
+              data={batchBars}
+              title="Batch progress"
+              hideTimeframe
+              wideBars
+              changePercentage={`${avgBatch}%`}
+              isPositiveChange
+              summaryTitle="Batches"
+              summaryHint="Average student progress"
+              emptyMessage="No active batches yet."
               className="h-full"
             />
           </div>
-          <div className="min-w-0 h-[300px] sm:h-[320px]">
+          <div className="min-h-[220px] min-w-0 overflow-hidden lg:h-full lg:min-h-0">
             <PerformanceMetrics
               courses={courses}
               reportHref="/admin/reports"
@@ -156,8 +158,8 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-3 lg:gap-3">
-          <div className="min-w-0 h-[280px] lg:col-span-2 sm:h-[300px]">
+        <div className="grid min-h-[240px] flex-1 grid-cols-1 gap-2.5 lg:min-h-0 lg:grid-cols-3 lg:gap-3">
+          <div className="min-h-[220px] min-w-0 overflow-hidden lg:col-span-2 lg:h-full lg:min-h-0">
             <RecentActivities
               activities={activities}
               viewAllHref="/admin/reports"
@@ -165,7 +167,7 @@ export default function AdminDashboard() {
               className="h-full"
             />
           </div>
-          <div className="min-w-0 h-[280px] sm:h-[300px]">
+          <div className="min-h-[220px] min-w-0 overflow-hidden lg:h-full lg:min-h-0">
             <UpcomingExams
               exams={exams}
               examListHref="/admin/exams"
@@ -177,49 +179,6 @@ export default function AdminDashboard() {
               }}
             />
           </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {[
-            {
-              href: "/admin/courses",
-              label: "Courses",
-              icon: BookOpen,
-              tone: "from-[#0F766E]/15 to-[#0E7490]/10 text-[#0E7490]",
-            },
-            {
-              href: "/admin/exams",
-              label: "Exams",
-              icon: ClipboardList,
-              tone: "from-teal-100 to-cyan-50 text-teal-800",
-            },
-            {
-              href: "/admin/reports",
-              label: "Reports",
-              icon: BarChart3,
-              tone: "from-slate-100 to-slate-50 text-slate-700",
-            },
-            {
-              href: "/admin/students",
-              label: "Students",
-              icon: Users,
-              tone: "from-cyan-100 to-teal-50 text-cyan-800",
-            },
-          ].map((a) => (
-            <Link key={a.href} href={a.href}>
-              <Card className="cursor-pointer border border-[#D4DEE3] bg-white shadow-sm transition hover:shadow-md">
-                <CardContent
-                  className={cn(
-                    "flex flex-col items-center gap-1 bg-gradient-to-br py-2.5 sm:py-3",
-                    a.tone
-                  )}
-                >
-                  <a.icon className="h-4 w-4" />
-                  <span className="text-xs font-semibold">{a.label}</span>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
         </div>
       </div>
     </DashboardLayout>

@@ -71,7 +71,7 @@ export default function UpcomingExams({
     <Card
       className={cn(
         "border border-white/20 bg-white/70 shadow-xl backdrop-blur-sm",
-        fillHeight && "flex h-full min-h-0 flex-col",
+        fillHeight && "flex h-full min-h-0 flex-col overflow-hidden",
         className
       )}
     >
@@ -88,7 +88,7 @@ export default function UpcomingExams({
       <CardContent
         className={cn(
           "flex flex-col px-4 pb-4 pt-1 sm:px-5",
-          fillHeight && "min-h-0 flex-1"
+          fillHeight && "min-h-0 flex-1 overflow-hidden"
         )}
       >
         {exams.length === 0 ? (
@@ -153,7 +153,7 @@ export default function UpcomingExams({
         {showScheduleButton ? (
           <Button
             size="sm"
-            className="group mt-auto w-full rounded-xl border-0 bg-accent-brand text-sm font-bold text-white hover:opacity-95"
+            className="group mt-3 w-full shrink-0 rounded-xl border-0 bg-accent-brand text-sm font-bold text-white hover:opacity-95"
             onClick={onScheduleExam}
           >
             <Plus className="mr-2 h-4 w-4 transition-transform group-hover:rotate-90" />
@@ -163,7 +163,7 @@ export default function UpcomingExams({
           <Button
             variant="outline"
             size="sm"
-            className="mt-auto h-8 w-full rounded-lg text-xs font-medium"
+            className="mt-3 h-8 w-full shrink-0 rounded-lg text-xs font-medium"
             asChild
           >
             <a href={examListHref}>

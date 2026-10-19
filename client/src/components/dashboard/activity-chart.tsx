@@ -19,10 +19,14 @@ type ActivityChartProps = {
   changePercentage: string;
   isPositiveChange: boolean;
   className?: string;
-  /** Controlled timeframe — when set with onTimeframeChange, parent owns the series */
   timeframe?: Timeframe;
   onTimeframeChange?: (tf: Timeframe) => void;
   emptyMessage?: string;
+  title?: string;
+  hideTimeframe?: boolean;
+  summaryTitle?: string;
+  summaryHint?: string;
+  wideBars?: boolean;
 };
 
 export default function ActivityChart({
@@ -33,6 +37,11 @@ export default function ActivityChart({
   timeframe: controlledTimeframe,
   onTimeframeChange,
   emptyMessage = "No activity yet for this period.",
+  title = "Student Activity",
+  hideTimeframe = false,
+  summaryTitle,
+  summaryHint = "vs previous period",
+  wideBars = false,
 }: ActivityChartProps) {
   const [internalTimeframe, setInternalTimeframe] = useState<Timeframe>("weekly");
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -46,7 +55,7 @@ export default function ActivityChart({
   const hasBars = data.some((d) => (d.count ?? d.percentage) > 0);
 
   return (
-    <Card className={cn("flex h-full flex-col border border-white/20 bg-white/70 shadow-xl backdrop-blur-sm", className)}>
+    <Card className={cn("flex h-full min-h-0 flex-col overflow-hidden border border-white/20 bg-white/70 shadow-xl backdrop-blur-sm", className)}>
       <CardHeader className="shrink-0 px-4 pb-0 pt-4 sm:px-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
@@ -54,9 +63,10 @@ export default function ActivityChart({
               <Activity className="h-4 w-4" />
             </div>
             <CardTitle className="bg-gradient-to-br from-gray-900 to-gray-700 bg-clip-text font-heading text-base font-semibold text-transparent">
-              Student Activity
+              {title}
             </CardTitle>
           </div>
+          {!hideTimeframe && (
           <div className="flex space-x-1 rounded-lg border border-white/20 bg-white/50 p-1">
             {(["weekly", "monthly", "yearly"] as const).map((time) => (
               <Button
@@ -75,6 +85,7 @@ export default function ActivityChart({
               </Button>
             ))}
           </div>
+          )}
         </div>
       </CardHeader>
       <CardContent className="flex min-h-0 flex-1 flex-col px-4 pb-4 sm:px-5">
@@ -97,7 +108,8 @@ export default function ActivityChart({
                   <div className="flex w-full flex-1 items-end justify-center pb-1">
                     <motion.div
                       className={cn(
-                        "relative w-full max-w-[24px] cursor-pointer overflow-hidden rounded-t-md",
+                        "relative cursor-pointer overflow-hidden rounded-t-md",
+                        wideBars ? "w-full max-w-[56px]" : "w-full max-w-[24px]",
                         item.isCurrentDay
                           ? "bg-accent-brand shadow-md"
                           : "bg-gradient-to-t from-[#0F766E] to-[#0E7490]"
@@ -117,7 +129,9 @@ export default function ActivityChart({
                           initial={{ opacity: 0, y: 6 }}
                           animate={{ opacity: 1, y: 0 }}
                         >
-                          {item.count != null
+                          {wideBars
+                            ? `${item.percentage}% · ${item.count ?? 0} students`
+                            : item.count != null
                             ? `${item.count} events`
                             : `${item.percentage}% activity`}
                         </motion.div>
@@ -138,16 +152,17 @@ export default function ActivityChart({
           </div>
         )}
 
-        <div className="mt-3 flex shrink-0 items-center justify-between border-t border-gray-200/50 pt-2.5">
-          <div>
-            <p className="text-sm font-medium text-gray-900">
-              {timeframe === "weekly"
-                ? "This week"
-                : timeframe === "monthly"
-                  ? "Recent weeks"
-                  : "Last 6 months"}
+        <div className="mt-3 flex shrink-0 items-center justify-between gap-3 border-t border-gray-200/50 pt-2.5">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-gray-900">
+              {summaryTitle ??
+                (timeframe === "weekly"
+                  ? "This week"
+                  : timeframe === "monthly"
+                    ? "Recent weeks"
+                    : "Last 6 months")}
             </p>
-            <p className="text-[11px] text-gray-500">vs previous period</p>
+            <p className="truncate text-[11px] text-gray-500">{summaryHint}</p>
           </div>
           <span
             className={cn(

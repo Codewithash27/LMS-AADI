@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import {
-  Bell,
   BookOpen,
   ChevronDown,
   LogOut,
   Lock,
   Menu,
-  Search,
   User as UserIcon,
 } from "lucide-react";
 import Sidebar from "@/components/layout/sidebar";
@@ -42,7 +40,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const isMobile = useIsMobile();
   const [location, setLocation] = useLocation();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     setUserMenuOpen(false);
@@ -64,12 +61,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
     logoutMutation.mutate();
   }, [logoutMutation]);
 
+  const syncedDash = location === "/" || location.startsWith("/admin/dashboard");
   const initials =
     `${user?.firstName?.charAt(0) || ""}${user?.lastName?.charAt(0) || ""}`.toUpperCase() ||
     "U";
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className={cn("flex h-screen overflow-hidden bg-background", syncedDash && "dash-app")}>
       <Sidebar
         mobileOpen={isMobile && mobileOpen}
         onMobileClose={closeMobile}
@@ -77,9 +75,22 @@ export default function MainLayout({ children }: MainLayoutProps) {
         onToggleCollapse={toggleCollapsed}
       />
 
-      <div className="main-content-premium flex min-h-0 min-w-0 flex-1 flex-col transition-[width,margin] duration-300 ease-out">
-        <header className="glass-appbar sticky top-0 z-30 shrink-0 border-b border-border/70 shadow-sm">
-          <div className="flex h-12 items-center justify-between gap-3 px-3 sm:px-4 md:px-5">
+      <div
+        className={cn(
+          "main-content-premium flex min-h-0 min-w-0 flex-1 flex-col transition-[width,margin] duration-300 ease-out",
+          syncedDash && "gap-3 py-3 pr-3",
+          syncedDash && (isMobile ? "pl-3" : "pl-0")
+        )}
+      >
+        <header
+          className={cn(
+            "glass-appbar z-30 shrink-0",
+            syncedDash
+              ? "rounded-[22px] border border-white/10"
+              : "sticky top-0 border-b border-border/70 shadow-sm"
+          )}
+        >
+          <div className={cn("flex items-center justify-between gap-3 px-3 sm:px-4", syncedDash ? "h-14" : "h-12")}>
             <div className="flex min-w-0 items-center gap-2">
               {isMobile && (
                 <button
@@ -92,37 +103,40 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 </button>
               )}
 
-              <Link href={homePath}>
-                <span className="font-display cursor-pointer truncate text-[13px] font-bold tracking-tight text-foreground">
-                  Edu Transform
-                </span>
-              </Link>
+              {syncedDash && user ? (
+                <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
+                  <span className="animate-wave-hand shrink-0 text-lg leading-none sm:text-xl" aria-hidden>
+                    👋
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold tracking-tight text-foreground sm:text-[15px]">
+                      <span className="sm:hidden">Hi, {firstName}</span>
+                      <span className="hidden sm:inline">
+                        {greeting.text}, {firstName}
+                      </span>
+                    </p>
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      <span className="sm:hidden">{greeting.text}</span>
+                      <span className="hidden sm:inline">Admin workspace</span>
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <Link href={homePath}>
+                  <span className="font-display cursor-pointer truncate text-[13px] font-bold tracking-tight text-foreground">
+                    Edu Transform
+                  </span>
+                </Link>
+              )}
             </div>
 
             {user && (
               <div className="flex min-w-0 items-center justify-end gap-2 sm:gap-3">
-                <p className="hidden truncate text-[11px] text-muted-foreground md:block">
-                  {greeting.text}, <span className="font-semibold text-foreground">{firstName}</span>
-                </p>
-
-                <div className="hidden items-center gap-1.5 rounded-full border border-border/80 bg-background/80 px-2.5 py-1.5 text-muted-foreground shadow-sm backdrop-blur-sm transition-shadow focus-within:shadow-md sm:flex">
-                  <Search className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
-                  <input
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search"
-                    className="w-24 bg-transparent text-[11px] outline-none placeholder:text-muted-foreground md:w-36"
-                    aria-label="Search"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  aria-label="Notifications"
-                >
-                  <Bell className="h-4 w-4" strokeWidth={1.8} />
-                </button>
+                {!syncedDash && (
+                  <p className="hidden truncate text-[11px] text-muted-foreground md:block">
+                    {greeting.text}, <span className="font-semibold text-foreground">{firstName}</span>
+                  </p>
+                )}
 
                 <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
                   <DropdownMenuTrigger asChild>
@@ -187,12 +201,24 @@ export default function MainLayout({ children }: MainLayoutProps) {
         </header>
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
-          <div className="w-full min-w-0 px-3 py-3 sm:px-4 md:px-5 md:py-4">
+          <div
+            className={cn(
+              "w-full min-w-0",
+              syncedDash ? "flex h-full min-h-0 min-w-0 flex-col" : "px-3 py-3 sm:px-4 md:px-5 md:py-4"
+            )}
+          >
             {children}
           </div>
         </main>
 
-        <footer className="sticky bottom-0 z-20 flex h-9 shrink-0 items-center justify-between border-t border-border bg-card px-3 sm:px-4">
+        <footer
+          className={cn(
+            "z-20 flex shrink-0 items-center justify-between px-3 sm:px-4",
+            syncedDash
+              ? "h-11 rounded-[22px] border border-white/10"
+              : "sticky bottom-0 h-9 border-t border-border bg-card"
+          )}
+        >
           <div className="flex items-center gap-1.5">
             <div className="flex h-5 w-5 items-center justify-center rounded-md bg-primary">
               <BookOpen className="h-2.5 w-2.5 text-primary-foreground" />
