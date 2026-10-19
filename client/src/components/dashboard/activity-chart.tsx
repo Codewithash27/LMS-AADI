@@ -55,7 +55,7 @@ export default function ActivityChart({
   const hasBars = data.some((d) => (d.count ?? d.percentage) > 0);
 
   return (
-    <Card className={cn("flex h-full min-h-0 flex-col overflow-hidden border border-white/20 bg-white/70 shadow-xl backdrop-blur-sm", className)}>
+    <Card className={cn("flex h-full min-h-0 flex-col border border-white/20 bg-white/70 shadow-xl backdrop-blur-sm", className)}>
       <CardHeader className="shrink-0 px-4 pb-0 pt-4 sm:px-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
@@ -94,7 +94,7 @@ export default function ActivityChart({
             {emptyMessage}
           </div>
         ) : (
-          <div className="relative flex min-h-[140px] flex-1 items-end space-x-2 sm:space-x-3">
+          <div className="relative flex min-h-0 flex-1 items-end gap-2 sm:gap-3">
             <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
               {[0, 25, 50, 75, 100].map((line) => (
                 <div key={line} className="border-t border-gray-200/40" />
@@ -105,7 +105,10 @@ export default function ActivityChart({
               const barPct = Math.max(item.percentage || 0, item.count ? 8 : 0);
               return (
                 <div key={`${item.day}-${index}`} className="relative flex h-full min-w-0 flex-1 flex-col items-center justify-end">
-                  <div className="flex w-full flex-1 items-end justify-center pb-1">
+                  <p className="mb-1 shrink-0 text-[12px] font-semibold leading-none text-gray-900">
+                    {item.percentage}%
+                  </p>
+                  <div className="flex w-full min-h-0 flex-1 items-end justify-center">
                     <motion.div
                       className={cn(
                         "relative cursor-pointer overflow-hidden rounded-t-md",
@@ -166,11 +169,11 @@ export default function ActivityChart({
           </div>
           <span
             className={cn(
-              "rounded-full px-2.5 py-1 text-xs font-bold",
+              "shrink-0 rounded-full px-2.5 py-1 text-xs font-bold",
               isPositiveChange ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
             )}
           >
-            {isPositiveChange ? "↗" : "↘"} {changePercentage}
+            {changePercentage} avg
           </span>
         </div>
       </CardContent>
