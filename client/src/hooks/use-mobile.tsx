@@ -1,7 +1,7 @@
 import * as React from "react";
 
-/** Sidebar mobile switch matches Campus Axis md breakpoint (960px). */
-const MOBILE_BREAKPOINT = 960;
+/** Sidebar hides under 980px and opens as a drawer. */
+const MOBILE_BREAKPOINT = 980;
 
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined);
