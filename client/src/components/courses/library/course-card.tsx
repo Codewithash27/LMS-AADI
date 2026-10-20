@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { Edit, Eye, Trash2, UserPlus } from "lucide-react";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 import { CourseCover } from "./course-cover";
 import { AvatarStack } from "./avatar-stack";
 
@@ -54,18 +55,26 @@ export function CourseCard({
         </div>
       </Link>
       <div className="course-actions">
-        <button type="button" aria-label="Edit course" onClick={onEdit}>
-          <Edit strokeWidth={2} />
-        </button>
-        <button type="button" aria-label="Assign students" onClick={onAssign}>
-          <UserPlus strokeWidth={2} />
-        </button>
-        <button type="button" aria-label="View course" onClick={onView}>
-          <Eye strokeWidth={2} />
-        </button>
-        <button type="button" aria-label="Delete course" onClick={onDelete}>
-          <Trash2 strokeWidth={2} />
-        </button>
+        <ActionTooltip label="Edit" side="bottom" className="course-tip">
+          <button type="button" aria-label="Edit course" onClick={onEdit}>
+            <Edit strokeWidth={2} />
+          </button>
+        </ActionTooltip>
+        <ActionTooltip label="Assign" side="bottom" className="course-tip">
+          <button type="button" aria-label="Assign students" onClick={onAssign}>
+            <UserPlus strokeWidth={2} />
+          </button>
+        </ActionTooltip>
+        <ActionTooltip label="View" side="bottom" className="course-tip">
+          <button type="button" aria-label="View course" onClick={onView}>
+            <Eye strokeWidth={2} />
+          </button>
+        </ActionTooltip>
+        <ActionTooltip label="Delete" side="bottom" className="course-tip">
+          <button type="button" aria-label="Delete course" onClick={onDelete}>
+            <Trash2 strokeWidth={2} />
+          </button>
+        </ActionTooltip>
       </div>
     </article>
   );

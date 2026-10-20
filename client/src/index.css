@@ -1178,6 +1178,15 @@
   height: 16px;
 }
 
+.course-tip {
+  border-color: rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+  background: #13131e;
+  color: #f3f2fa;
+  font-family: Manrope, system-ui, sans-serif;
+  font-weight: 800;
+}
+
 .course-skeleton {
   height: 320px;
   border-radius: 28px;

@@ -4,13 +4,12 @@ import CourseEditor from "@/components/courses/course-editor";
 import { PageHeader } from "@/components/courses/library/page-header";
 import { FilterPills, type LibraryFilter } from "@/components/courses/library/filter-pills";
 import { CourseCard } from "@/components/courses/library/course-card";
+import { AssignStudentsDialog } from "@/components/courses/assign-students-dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Plus,
   Trash2,
   Users,
-  UserPlus,
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -23,12 +22,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  CreateFormDialog,
-  CreateFormFooter,
-} from "@/components/ui/create-form-dialog";
-import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "@/lib/utils";
 import { getCourseThumbnailSrc } from "@/lib/course-thumbnail";
 import { getProfilePhotoSrc } from "@/lib/profile-photo";
 
@@ -257,21 +250,6 @@ export default function AdminCourses() {
     setIsAssignDialogOpen(true);
   };
 
-  const toggleStudent = (studentId: number, checked: boolean) => {
-    if (!checked && batchLockedUserIds.includes(studentId)) {
-      toast({
-        title: "Student locked by batch",
-        description:
-          "This student gets the course from a batch. Remove them from that batch first.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setSelectedStudentIds((prev) =>
-      checked ? [...prev, studentId] : prev.filter((id) => id !== studentId)
-    );
-  };
-
   const handleAssignStudent = () => {
     if (!selectedCourse?.id) return;
     const selected = selectedStudentIds.map(Number);
@@ -434,99 +412,19 @@ export default function AdminCourses() {
         course={selectedCourse}
       />
 
-      <CreateFormDialog
+      <AssignStudentsDialog
         open={isAssignDialogOpen}
         onOpenChange={setIsAssignDialogOpen}
-        title="Assign to Student"
-        description={
-          selectedCourse
-            ? `Select students for "${selectedCourse.title}". Batch members stay locked.`
-            : "Select students to enroll"
-        }
-        icon={<UserPlus className="h-5 w-5 text-white" />}
-        maxWidth="max-w-lg"
-        tone="glass"
-        footer={
-          <CreateFormFooter
-            tone="glass"
-            onCancel={() => setIsAssignDialogOpen(false)}
-            submitLabel="Save Enrollments"
-            pendingLabel="Saving..."
-            isPending={assignMutation.isPending}
-            submitDisabled={isLoadingEnrollments || isLoadingBatchLocks}
-            submitType="button"
-            onSubmit={handleAssignStudent}
-          />
-        }
-      >
-        <div className="space-y-3">
-          <div className="flex items-center justify-between text-sm text-[#8E8EA0]">
-            <span>
-              {selectedStudentIds.length} of {students.length} selected
-            </span>
-            <span>
-              {batchLockedUserIds.length} via batch
-            </span>
-          </div>
-
-          <div className="max-h-[min(320px,40vh)] overflow-y-auto overflow-x-hidden rounded-xl border border-white/10 bg-white/[0.03]">
-            {isLoadingEnrollments || isLoadingBatchLocks ? (
-              <div className="flex items-center justify-center py-10">
-                <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#8B5CF6] border-t-transparent" />
-              </div>
-            ) : students.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-[#8E8EA0]">
-                No students available
-              </p>
-            ) : (
-              <ul className="divide-y divide-white/10">
-                {students.map((student) => {
-                  const checked = selectedStudentIds.includes(student.id);
-                  const wasEnrolled = initialEnrolledIds.includes(student.id);
-                  const lockedByBatch = batchLockedUserIds.includes(student.id);
-                  return (
-                    <li key={student.id}>
-                      <label
-                        className={cn(
-                          "flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.04]",
-                          checked && "bg-[#8B5CF6]/10",
-                          lockedByBatch && "cursor-not-allowed bg-white/[0.03]"
-                        )}
-                      >
-                        <Checkbox
-                          checked={checked || lockedByBatch}
-                          disabled={lockedByBatch}
-                          onCheckedChange={(value) =>
-                            toggleStudent(student.id, value === true)
-                          }
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[15px] font-medium text-[#F4F4F8]">
-                            {student.firstName} {student.lastName}
-                          </p>
-                          <p className="truncate text-xs text-[#8E8EA0]">
-                            {student.username}
-                            {student.email ? ` · ${student.email}` : ""}
-                          </p>
-                        </div>
-                        {lockedByBatch ? (
-                          <Badge className="shrink-0 rounded-full border border-amber-400/20 bg-amber-400/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-200">
-                            Via batch
-                          </Badge>
-                        ) : wasEnrolled ? (
-                          <Badge className="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300">
-                            Enrolled
-                          </Badge>
-                        ) : null}
-                      </label>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        </div>
-      </CreateFormDialog>
+        courseTitle={selectedCourse?.title || ""}
+        students={students}
+        selectedIds={selectedStudentIds}
+        initialIds={initialEnrolledIds}
+        lockedIds={batchLockedUserIds}
+        isLoading={isLoadingEnrollments || isLoadingBatchLocks}
+        isSaving={assignMutation.isPending}
+        onChange={setSelectedStudentIds}
+        onSave={handleAssignStudent}
+      />
 
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="max-w-md">

@@ -1,0 +1,353 @@
+import { useEffect, useMemo, useState } from "react";
+import { Check, Loader2, Lock, Search, UserPlus, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { getProfilePhotoSrc } from "@/lib/profile-photo";
+
+type AssignStudent = {
+  id: number;
+  firstName?: string | null;
+  lastName?: string | null;
+  username?: string | null;
+  email?: string | null;
+  profilePhoto?: string | null;
+};
+
+type AssignStudentsDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  courseTitle: string;
+  students: AssignStudent[];
+  selectedIds: number[];
+  initialIds: number[];
+  lockedIds: number[];
+  isLoading: boolean;
+  isSaving: boolean;
+  onChange: (next: number[]) => void;
+  onSave: () => void;
+};
+
+const PALETTE = ["#7C6CFF", "#43D9E8", "#D4FF3F", "#FF8A6B", "#F5B94A"];
+
+function displayName(student: AssignStudent) {
+  const name = `${student.firstName || ""} ${student.lastName || ""}`.trim();
+  return name || student.username || student.email || "Student";
+}
+
+function subline(student: AssignStudent, name: string) {
+  const parts = [student.username, student.email]
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value));
+  const unique = [...new Set(parts)].filter(
+    (value) => value.toLowerCase() !== name.trim().toLowerCase()
+  );
+  return unique.length ? unique.join(" · ") : null;
+}
+
+function initialsOf(student: AssignStudent, name: string) {
+  const letters = `${student.firstName?.charAt(0) || ""}${student.lastName?.charAt(0) || ""}`.toUpperCase();
+  return letters || name.slice(0, 2).toUpperCase();
+}
+
+function Face({ student, name }: { student: AssignStudent; name: string }) {
+  const [broken, setBroken] = useState(false);
+  const photo = getProfilePhotoSrc(student.profilePhoto);
+  const color = PALETTE[Math.abs(student.id) % PALETTE.length];
+  if (!photo || broken) {
+    return (
+      <span
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold text-[#0A0A0F]"
+        style={{ background: color }}
+      >
+        {initialsOf(student, name)}
+      </span>
+    );
+  }
+  return (
+    <img
+      src={photo}
+      alt=""
+      className="h-10 w-10 shrink-0 rounded-full object-cover"
+      onError={() => setBroken(true)}
+    />
+  );
+}
+
+export function AssignStudentsDialog({
+  open,
+  onOpenChange,
+  courseTitle,
+  students,
+  selectedIds,
+  initialIds,
+  lockedIds,
+  isLoading,
+  isSaving,
+  onChange,
+  onSave,
+}: AssignStudentsDialogProps) {
+  const [query, setQuery] = useState("");
+  const [tab, setTab] = useState<"all" | "selected" | "open">("all");
+  const locked = useMemo(() => new Set(lockedIds.map(Number)), [lockedIds]);
+  const selected = useMemo(() => new Set(selectedIds.map(Number)), [selectedIds]);
+  const initial = useMemo(() => new Set(initialIds.map(Number)), [initialIds]);
+
+  useEffect(() => {
+    if (!open) {
+      setQuery("");
+      setTab("all");
+    }
+  }, [open]);
+
+  const keepLocked = (ids: number[]) => Array.from(new Set([...ids.map(Number), ...locked]));
+
+  const toggle = (id: number) => {
+    if (locked.has(id)) return;
+    const next = selected.has(id)
+      ? selectedIds.filter((item) => Number(item) !== id)
+      : [...selectedIds, id];
+    onChange(keepLocked(next));
+  };
+
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return students.filter((student) => {
+      const id = Number(student.id);
+      if (tab === "selected" && !selected.has(id)) return false;
+      if (tab === "open" && initial.has(id)) return false;
+      if (!needle) return true;
+      const hay = [displayName(student), student.username, student.email]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(needle);
+    });
+  }, [students, query, tab, selected, initial]);
+
+  const visibleToggleable = filtered.filter((student) => !locked.has(Number(student.id)));
+  const allVisibleSelected =
+    visibleToggleable.length > 0 &&
+    visibleToggleable.every((student) => selected.has(Number(student.id)));
+
+  const selectVisible = () => {
+    if (allVisibleSelected) {
+      const hide = new Set(visibleToggleable.map((student) => Number(student.id)));
+      onChange(keepLocked(selectedIds.filter((id) => !hide.has(Number(id)))));
+      return;
+    }
+    onChange(keepLocked([...selectedIds, ...visibleToggleable.map((student) => Number(student.id))]));
+  };
+
+  const toAdd = selectedIds.filter((id) => !initial.has(Number(id))).length;
+  const toRemove = initialIds.filter((id) => !selected.has(Number(id)) && !locked.has(Number(id))).length;
+  const unchanged = toAdd === 0 && toRemove === 0;
+  const ratio = students.length === 0 ? 0 : Math.round((selectedIds.length / students.length) * 100);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[600px] gap-0 overflow-hidden rounded-[28px] border border-white/[0.09] bg-[#0C0C14] p-0 font-[Manrope,system-ui,sans-serif] text-[#F3F2FA] shadow-[0_28px_80px_rgba(0,0,0,0.55)] [&>button.absolute]:hidden">
+        <div className="flex items-start gap-4 px-6 pb-5 pt-6">
+          <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl bg-[#D4FF3F] text-[#0A0A0F]">
+            <UserPlus className="h-6 w-6" aria-hidden />
+          </div>
+          <div className="min-w-0 flex-1 pt-0.5">
+            <DialogTitle className="font-[Fraunces,Georgia,serif] text-[32px] font-medium leading-none tracking-[-0.03em] text-[#F3F2FA]">
+              Assign to <i className="text-[#D4FF3F]">students</i>
+            </DialogTitle>
+            <DialogDescription className="mt-2 text-sm leading-5 text-[#A3A1B8]">
+              Choose who gets access to “{courseTitle || "this course"}”. Batch members stay locked.
+            </DialogDescription>
+          </div>
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={() => onOpenChange(false)}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#13131E] text-[#F3F2FA] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D4FF3F]"
+          >
+            <X className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
+
+        <div className="border-t border-white/[0.09] bg-[#0A0A11] px-6 py-4">
+          <div className="flex items-end justify-between gap-3">
+            <p className="text-[#F3F2FA]">
+              <span className="font-[Fraunces,Georgia,serif] text-4xl font-medium leading-none">{selectedIds.length}</span>
+              <span className="ml-2 text-sm text-[#A3A1B8]">of {students.length} selected</span>
+            </p>
+            {lockedIds.length > 0 ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F7C766]/15 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-[#F7C766]">
+                <Lock className="h-3 w-3" aria-hidden />
+                {lockedIds.length} via batch
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10" role="img" aria-label={`${ratio}% selected`}>
+            <span className="block h-full rounded-full bg-[#D4FF3F]" style={{ width: `${ratio}%` }} />
+          </div>
+        </div>
+
+        <div className="px-6 pt-4">
+          <label className="flex h-[50px] items-center gap-2 rounded-2xl border border-transparent bg-[#13131E] px-4 focus-within:border-[#D4FF3F]">
+            <Search className="h-4 w-4 shrink-0 text-[#8E8CA6]" aria-hidden />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search name, username, or email"
+              aria-label="Search students"
+              className="h-full w-full bg-transparent text-sm text-[#F3F2FA] outline-none placeholder:text-[#8E8CA6]"
+            />
+            {query ? (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => setQuery("")}
+                className="rounded-full p-1 text-[#A3A1B8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#D4FF3F]"
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+            ) : null}
+          </label>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 px-6 py-3">
+          <div className="flex rounded-full bg-[#13131E] p-1" role="tablist" aria-label="Filter students">
+            {(
+              [
+                ["all", "All"],
+                ["selected", "Selected"],
+                ["open", "Not enrolled"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={tab === id}
+                onClick={() => setTab(id)}
+                className={`rounded-full px-3 py-1.5 text-xs font-extrabold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#D4FF3F] ${
+                  tab === id ? "bg-[#D4FF3F] text-[#0A0A0F]" : "text-[#A3A1B8]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={selectVisible}
+            disabled={visibleToggleable.length === 0}
+            className="rounded-full px-2 text-sm font-extrabold text-[#D4FF3F] hover:text-[#E4FF7A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D4FF3F] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {allVisibleSelected ? "Clear visible" : "Select visible"}
+          </button>
+        </div>
+
+        <div className="max-h-[min(360px,38vh)] space-y-2 overflow-y-auto px-6 pb-4 [scrollbar-color:rgba(255,255,255,0.28)_transparent] [scrollbar-width:thin]">
+          {isLoading ? (
+            [0, 1, 2, 3].map((row) => (
+              <div key={row} className="h-[68px] animate-pulse rounded-2xl bg-[#13131E]" />
+            ))
+          ) : filtered.length === 0 ? (
+            <div className="px-4 py-10 text-center">
+              <p className="font-[Fraunces,Georgia,serif] text-2xl text-[#F3F2FA]">No students match</p>
+              <p className="mt-1 text-sm text-[#8E8CA6]">Try another name or switch the filter.</p>
+            </div>
+          ) : (
+            filtered.map((student) => {
+              const id = Number(student.id);
+              const name = displayName(student);
+              const detail = subline(student, name);
+              const isLocked = locked.has(id);
+              const isSelected = selected.has(id) || isLocked;
+              const enrolled = initial.has(id);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={isSelected}
+                  disabled={isLocked}
+                  onClick={() => toggle(id)}
+                  className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D4FF3F] ${
+                    isLocked
+                      ? "cursor-not-allowed border-white/[0.06] bg-[#0F0F18]"
+                      : isSelected
+                        ? "border-[#D4FF3F]/30 bg-[#D4FF3F]/[0.06] hover:bg-[#D4FF3F]/10"
+                        : "border-white/[0.06] bg-[#0F0F18] hover:bg-[#13131E]"
+                  }`}
+                >
+                  <Face student={student} name={name} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-bold text-[#F3F2FA]">{name}</span>
+                    {detail ? <span className="block truncate text-xs text-[#8E8CA6]">{detail}</span> : null}
+                  </span>
+                  {isLocked ? (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#F7C766]/15 px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#F7C766]">
+                      <Lock className="h-3 w-3" aria-hidden />
+                      Batch
+                    </span>
+                  ) : enrolled ? (
+                    <span className="shrink-0 rounded-full bg-[#43D9E8]/15 px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#43D9E8]">
+                      Enrolled
+                    </span>
+                  ) : null}
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+                      isLocked
+                        ? "bg-[#8E8CA6] text-[#0A0A0F]"
+                        : isSelected
+                          ? "bg-[#D4FF3F] text-[#0A0A0F]"
+                          : "border border-white/15 bg-transparent"
+                    }`}
+                    aria-hidden
+                  >
+                    {isSelected ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : null}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-white/[0.09] bg-[#0A0A11] px-6 py-4">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs font-extrabold">
+            {unchanged ? (
+              <span className="text-[#8E8CA6]">No changes yet</span>
+            ) : (
+              <>
+                {toAdd > 0 ? (
+                  <span className="rounded-full bg-[#D4FF3F]/[0.12] px-2.5 py-1 text-[#D4FF3F]">+{toAdd} to add</span>
+                ) : null}
+                {toRemove > 0 ? (
+                  <span className="rounded-full bg-red-500/[0.12] px-2.5 py-1 text-red-300">−{toRemove} to remove</span>
+                ) : null}
+              </>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="h-12 rounded-full border border-white/[0.09] bg-[#0F0F18] px-5 text-sm font-extrabold text-[#F3F2FA] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D4FF3F]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={isLoading || isSaving || unchanged}
+              className="inline-flex h-12 items-center gap-2 rounded-full bg-[#D4FF3F] px-5 text-sm font-extrabold text-[#0A0A0F] hover:bg-[#E4FF7A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D4FF3F] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Check className="h-4 w-4" aria-hidden />}
+              {isSaving ? "Saving…" : "Save enrollments"}
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
