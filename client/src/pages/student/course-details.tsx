@@ -1,30 +1,25 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import Header from "@/components/layout/header";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { getFirstName, getTimeGreeting } from "@/lib/greeting";
+import { getProfilePhotoSrc } from "@/lib/profile-photo";
+import { CourseHero } from "@/components/student-course/CourseHero";
+import { LessonActions } from "@/components/student-course/LessonActions";
+import { ModulePanel, type PanelModule } from "@/components/student-course/ModulePanel";
+import { PlayerFrame } from "@/components/student-course/PlayerFrame";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import VideoComponent from "@/components/courses/video-component";
 import {
   BookOpen,
-  BookText,
-  CheckCircle2,
-  ChevronLeft,
   Clock,
   ClipboardList,
   ExternalLink,
   FileText,
   Play,
-  Video
 } from "lucide-react";
-import { getCourseThumbnailSrc } from "@/lib/course-thumbnail";
 import { hasQuizDraft, loadQuizDraft } from "@/lib/quiz-draft";
 import { getQuizAttempts } from "@/lib/quiz-attempts";
 import { parseLessonQuizData } from "@/lib/course-quiz-data";
@@ -44,7 +39,10 @@ export default function StudentCourseDetails() {
   const [activeModuleId, setActiveModuleId] = useState<number | null>(null);
   const [activeLessonId, setActiveLessonId] = useState<number | null>(null);
   const [draftTick, setDraftTick] = useState(0);
+  const [scrollSignal, setScrollSignal] = useState(0);
+  const pendingLessonId = useRef<number | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
   
   // Extract course ID from URL
   const courseId = parseInt(location.split("/").pop() || "0");
@@ -140,14 +138,21 @@ export default function StudentCourseDetails() {
     }
   }, [modules, activeModuleId]);
   
-  // Set first lesson as active when module changes
+  // Set first lesson as active when module changes, unless Next/Previous asked for a specific lesson.
   useEffect(() => {
-    if ((lessons as any[]).length > 0) {
-      setActiveLessonId((lessons as any[])[0].id);
-    } else {
+    const list = lessons as any[];
+    if (list.length > 0) {
+      const pending = pendingLessonId.current;
+      if (pending && list.some((lesson) => lesson.id === pending)) {
+        setActiveLessonId(pending);
+        pendingLessonId.current = null;
+      } else if (!pending) {
+        setActiveLessonId(list[0].id);
+      }
+    } else if (!isLoadingLessons) {
       setActiveLessonId(null);
     }
-  }, [lessons, activeModuleId]);
+  }, [lessons, activeModuleId, isLoadingLessons]);
 
   // Refresh progress when returning from quiz tab
   useEffect(() => {
@@ -171,589 +176,359 @@ export default function StudentCourseDetails() {
     return enrollment.progress || 0;
   };
   
-  // Get lesson icon based on content type
-  const getLessonIcon = (contentType: string) => {
-    switch (contentType.toLowerCase()) {
-      case 'video':
-        return <Video className="h-4 w-4" />;
-      case 'quiz':
-        return <ClipboardList className="h-4 w-4" />;
-      case 'pdf':
-        return <FileText className="h-4 w-4" />;
-      case 'text':
-      default:
-        return <BookText className="h-4 w-4" />;
-    }
-  };
 
   const documentUrl =
     activeLesson &&
     ["pdf", "text"].includes(String(activeLesson.contentType).toLowerCase())
       ? extractLessonUrl(activeLesson.content)
       : null;
-  
-  // Check if a lesson is completed
+
   const isLessonCompleted = (lessonId: number) => {
     if (!courseProgress) return false;
-    
-    // Check if this lesson is marked as completed in the course progress data
     const modulesWithLessons = (courseProgress as any).modules || [];
-    
     for (const module of modulesWithLessons) {
       const lesson = module.lessons?.find((l: any) => l.id === lessonId);
-      if (lesson && lesson.completed) {
-        return true;
-      }
+      if (lesson && lesson.completed) return true;
     }
-    
     return false;
   };
-  
-  if (isLoadingCourse) {
+
+  const progressModules = ((courseProgress as any)?.modules || []) as any[];
+  const panelModules: PanelModule[] = (modules as any[]).map((module) => {
+    const fromProgress = progressModules.find((item) => item.id === module.id);
+    const source = fromProgress?.lessons?.length
+      ? fromProgress.lessons
+      : module.id === activeModuleId
+        ? (lessons as any[])
+        : [];
+    const panelLessons = source.map((lesson: any) => ({
+      id: lesson.id,
+      title: lesson.title,
+      contentType: lesson.contentType || "text",
+      completed: Boolean(lesson.completed) || isLessonCompleted(lesson.id),
+      locked: Boolean(lesson.locked || lesson.isLocked),
+    }));
+    return {
+      id: module.id,
+      title: module.title,
+      complete: panelLessons.length > 0 && panelLessons.every((lesson: { completed: boolean }) => lesson.completed),
+      lessons: panelLessons,
+    };
+  });
+
+  const flat = progressModules.length
+    ? progressModules.flatMap((module) =>
+        (module.lessons || []).map((lesson: any) => ({ moduleId: module.id, lessonId: lesson.id }))
+      )
+    : (lessons as any[]).map((lesson) => ({ moduleId: activeModuleId, lessonId: lesson.id }));
+  const flatIndex = flat.findIndex(
+    (item) => item.moduleId === activeModuleId && item.lessonId === activeLessonId
+  );
+  const lessonIndex = (lessons as any[]).findIndex((lesson) => lesson.id === activeLessonId);
+  const atStart = flatIndex >= 0 ? flatIndex === 0 : lessonIndex <= 0;
+  const atEnd = flatIndex >= 0
+    ? flatIndex === flat.length - 1
+    : lessonIndex < 0 || lessonIndex === (lessons as any[]).length - 1;
+
+  const goLesson = (step: number) => {
+    if (flatIndex >= 0) {
+      const next = flat[flatIndex + step];
+      if (!next) return;
+      if (next.moduleId !== activeModuleId) {
+        pendingLessonId.current = next.lessonId;
+        setActiveModuleId(next.moduleId);
+      } else {
+        setActiveLessonId(next.lessonId);
+      }
+    } else {
+      const next = (lessons as any[])[lessonIndex + step];
+      if (next) setActiveLessonId(next.id);
+    }
+    setScrollSignal((value) => value + 1);
+  };
+
+  if (isLoadingCourse || isLoadingEnrollments) {
     return (
       <DashboardLayout>
-        <div className="animate-pulse space-y-4">
-          <div className="h-10 bg-gray-200 rounded w-1/4"></div>
-          <div className="h-6 bg-gray-200 rounded w-1/2"></div>
-          <div className="h-32 bg-gray-200 rounded"></div>
+        <div className="scp">
+          <div className="scp-page-skeleton" aria-busy="true">
+            <div />
+            <div />
+          </div>
         </div>
       </DashboardLayout>
     );
   }
-  
+
   if (!course) {
     return (
       <DashboardLayout>
-        <div className="text-center py-12">
-          <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-1">Course not found</h3>
-          <p className="text-gray-500 mb-4">
-            The course you're looking for doesn't exist or you don't have access to it.
-          </p>
-          <Link href="/student/my-courses">
-            <Button>
-              <ChevronLeft className="mr-2 h-4 w-4" />
+        <div className="scp">
+          <div className="scp-miss">
+            <BookOpen aria-hidden />
+            <h2>Course not found</h2>
+            <p>The course you're looking for doesn't exist or you don't have access to it.</p>
+            <Link href="/student/my-courses" className="scp-back">
               Back to My Courses
-            </Button>
-          </Link>
+            </Link>
+          </div>
         </div>
       </DashboardLayout>
     );
   }
 
-  const thumb = getCourseThumbnailSrc((course as any).thumbnail);
-  
+  const moduleNumber = (modules as any[]).findIndex((module) => module.id === activeModuleId) + 1;
+  const kind = String(activeLesson?.contentType || "").toLowerCase();
+  const kindLabel = kind === "video" ? "Video lesson" : kind === "quiz" ? "Quiz" : "Document";
+  const lessonWords = String(activeLesson?.title || "").trim().split(/\s+/);
+  const lessonLast = lessonWords.pop() || "";
+  const lessonRest = lessonWords.join(" ");
+  const kindTone = kind === "video" ? "cyan" : kind === "quiz" ? "violet" : "amber";
+  const completed = activeLesson ? isLessonCompleted(activeLesson.id) : false;
+  const firstName = getFirstName(`${user?.firstName || ""} ${user?.lastName || ""}`.trim() || user?.username || "there");
+  const initials = `${user?.firstName?.charAt(0) || ""}${user?.lastName?.charAt(0) || ""}`.toUpperCase() || "U";
+
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <Link href="/student/my-courses">
-            <Button variant="ghost" size="sm" className="mb-2">
-              <ChevronLeft className="mr-1 h-4 w-4" />
-              Back to My Courses
-            </Button>
-          </Link>
+      <div className="scp">
+        <CourseHero
+          greeting={getTimeGreeting().text}
+          name={firstName}
+          photo={getProfilePhotoSrc(user?.profilePhoto)}
+          initials={initials}
+          title={(course as any).title}
+          difficulty={(course as any).difficulty}
+          category={(course as any).category}
+          access={(course as any).isEnrollmentRequired ? "Restricted" : "Open"}
+          progress={enrollment ? calculateProgress() : null}
+          tab={activeTab}
+          onTab={setActiveTab}
+        />
 
-          {thumb ? (
-            <div className="mb-4 overflow-hidden rounded-2xl border border-border bg-muted">
-              <img
-                src={thumb}
-                alt=""
-                className="h-48 w-full object-cover sm:h-56"
-              />
-            </div>
-          ) : null}
-          
-          <Header title={(course as any).title} />
-          
-          <div className="mt-4 flex justify-between items-center">
-            <div className="flex space-x-2">
-              <Badge variant="outline" className="bg-blue-100 text-blue-800">
-                {(course as any).difficulty}
-              </Badge>
-              <Badge variant="outline" className="bg-gray-100">
-                {(course as any).category}
-              </Badge>
-              {(course as any).isEnrollmentRequired && (
-                <Badge variant="outline" className="bg-teal-100 text-teal-800">
-                  Restricted
-                </Badge>
+        {activeTab === "overview" && (
+          <div className="scp-panel" role="tabpanel" id="scp-panel-overview" aria-labelledby="scp-tab-overview">
+            <section className="scp-block">
+              <h2>About this course</h2>
+              <p>{(course as any).description}</p>
+              <h3>What you'll learn</h3>
+              <ul>
+                <li>Core concepts and fundamentals</li>
+                <li>Practical application of skills</li>
+                <li>Advanced techniques and best practices</li>
+              </ul>
+            </section>
+            <section className="scp-block">
+              <h2>Course structure</h2>
+              <p>This course contains {(modules as any[]).length} modules with various lessons</p>
+              {isLoadingModules ? (
+                <div className="scp-skeletons" aria-busy="true"><div /><div /><div /></div>
+              ) : (modules as any[]).length === 0 ? (
+                <p>No modules available yet.</p>
+              ) : (
+                (modules as any[]).map((module) => (
+                  <div key={module.id} className="scp-structure">
+                    <h3>{module.title}</h3>
+                    <p>{module.description}</p>
+                  </div>
+                ))
               )}
-            </div>
-            
-            {enrollment && (
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-500">Progress: {calculateProgress()}%</span>
-                <Progress value={calculateProgress()} className="w-32" />
-              </div>
-            )}
+              <button type="button" className="scp-start" onClick={() => setActiveTab("content")}>
+                Start Learning
+              </button>
+            </section>
           </div>
-        </div>
-        
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="content">Course Content</TabsTrigger>
-            <TabsTrigger value="exams">Exams</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="overview" className="space-y-6">
-            <Card className="backdrop-blur-sm bg-white/70 border border-white/20 shadow-lg">
-              <CardHeader>
-                <CardTitle>About this Course</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="prose prose-sm max-w-none">
-                  <p>{(course as any).description}</p>
-                  <h3>What you'll learn</h3>
-                  <ul>
-                    <li>Core concepts and fundamentals</li>
-                    <li>Practical application of skills</li>
-                    <li>Advanced techniques and best practices</li>
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="backdrop-blur-sm bg-white/70 border border-white/20 shadow-lg">
-              <CardHeader>
-                <CardTitle>Course Structure</CardTitle>
-                <CardDescription>
-                  This course contains {(modules as any[]).length} modules with various lessons
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {isLoadingModules ? (
-                    <div className="animate-pulse space-y-4">
-                      {[1, 2, 3].map(i => (
-                        <div key={i} className="h-12 bg-gray-200 rounded"></div>
-                      ))}
-                    </div>
-                  ) : (modules as any[]).length === 0 ? (
-                    <p className="text-gray-500">No modules available yet.</p>
-                  ) : (
-                    (modules as any[]).map((module, index) => (
-                      <div key={module.id} className="border rounded-lg p-4">
-                        <h3 className="font-medium">{module.title}</h3>
-                        <p className="text-sm text-gray-500">{module.description}</p>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button onClick={() => setActiveTab("content")} className="w-full">
-                  Start Learning
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="content" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="md:col-span-1 space-y-4">
-                <Card className="backdrop-blur-sm bg-white/70 border border-white/20 shadow-lg">
-                  <CardHeader>
-                    <CardTitle>Course Modules</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="divide-y">
-                      {isLoadingModules ? (
-                        <div className="animate-pulse p-4 space-y-4">
-                          {[1, 2, 3].map(i => (
-                            <div key={i} className="h-10 bg-gray-200 rounded"></div>
-                          ))}
-                        </div>
-                      ) : (modules as any[]).length === 0 ? (
-                        <div className="p-4">
-                          <p className="text-gray-500">No modules available yet.</p>
-                        </div>
-                      ) : (
-                        (modules as any[]).map((module, index) => (
-                          <div 
-                            key={module.id} 
-                            className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${
-                              activeModuleId === module.id ? 'bg-gray-50' : ''
-                            }`}
-                            onClick={() => setActiveModuleId(module.id)}
-                          >
-                            <div className="font-medium">{module.title}</div>
-                            <div className="text-sm text-gray-500 mt-1">
-                              {module.description}
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-              
-              <div className="md:col-span-2 space-y-4">
-                {activeModuleId ? (
+        )}
+
+        {activeTab === "content" && (
+          <div className="scp-panel" role="tabpanel" id="scp-panel-content" aria-labelledby="scp-tab-content">
+            <div className="scp-stage">
+              <ModulePanel
+                modules={panelModules}
+                loading={isLoadingModules || Boolean(enrollment && isLoadingProgress)}
+                activeModuleId={activeModuleId}
+                activeLessonId={activeLessonId}
+                scrollSignal={scrollSignal}
+                onSelectModule={setActiveModuleId}
+                onSelectLesson={setActiveLessonId}
+              />
+              <div className="scp-col">
+                {!activeModuleId ? (
+                  <div className="scp-card scp-miss">
+                    <BookOpen aria-hidden />
+                    <h3>Select a module</h3>
+                    <p>Choose a module from the list to start learning</p>
+                  </div>
+                ) : isLoadingLessons && !activeLesson ? (
+                  <PlayerFrame kind="loading" />
+                ) : !activeLesson ? (
+                  <div className="scp-card scp-miss">
+                    <p>No lessons yet</p>
+                  </div>
+                ) : (
                   <>
-                    <Card className="backdrop-blur-sm bg-white/70 border border-white/20 shadow-lg">
-                      <CardHeader>
-                        <CardTitle>
-                          {activeModuleId && 
-                            (modules as any[]).find(m => m.id === activeModuleId)?.title
-                          }
-                        </CardTitle>
-                        <CardDescription>
-                          {activeModuleId && 
-                            (modules as any[]).find(m => m.id === activeModuleId)?.description
-                          }
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        <div className="divide-y">
-                          {isLoadingLessons ? (
-                            <div className="animate-pulse p-4 space-y-4">
-                              {[1, 2, 3].map(i => (
-                                <div key={i} className="h-10 bg-gray-200 rounded"></div>
-                              ))}
-                            </div>
-                          ) : (lessons as any[]).length === 0 ? (
-                            <div className="p-4">
-                              <p className="text-gray-500">No lessons available for this module yet.</p>
-                            </div>
-                          ) : (
-                            (lessons as any[]).map((lesson) => (
-                              <div 
-                                key={lesson.id} 
-                                className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors flex items-center justify-between ${
-                                  activeLessonId === lesson.id ? 'bg-gray-50' : ''
-                                }`}
-                                onClick={() => setActiveLessonId(lesson.id)}
-                              >
-                                <div className="flex items-center">
-                                  {getLessonIcon(lesson.contentType)}
-                                  <span className="ml-2">{lesson.title}</span>
-                                </div>
-                                
-                                {isLessonCompleted(lesson.id) && (
-                                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                                )}
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                    
-                    {activeLesson && (
-                      <Card className="backdrop-blur-sm bg-white/70 border border-white/20 shadow-lg">
-                        <CardHeader>
-                          <CardTitle>{activeLesson.title}</CardTitle>
-                          <div className="flex items-center text-sm text-gray-500">
-                            {getLessonIcon(activeLesson.contentType)}
-                            <span className="ml-1 capitalize">{activeLesson.contentType} lesson</span>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          {activeLesson.contentType === 'quiz' ? (
-                            <div className="rounded-2xl border border-border bg-gradient-to-br from-brand-turquoise/10 to-brand-blue/10 p-6 space-y-4">
-                              {(() => {
-                                const hasDraft =
-                                  !!activeModuleId &&
-                                  hasQuizDraft(courseId, activeModuleId, activeLesson.id);
-                                const attempts =
-                                  activeModuleId
-                                    ? getQuizAttempts(courseId, activeModuleId, activeLesson.id)
-                                    : 0;
-                                void draftTick;
-                                const ctaLabel = hasDraft
-                                  ? "Continue Test"
-                                  : attempts > 0
-                                    ? "Retake Test"
-                                    : "Start Test";
-                                return (
-                                  <>
-                              <div className="flex items-start justify-between gap-4">
+                    {kind === "video" ? (
+                      <PlayerFrame kind="video">
+                        <VideoComponent videoUrl={activeLesson.content} />
+                      </PlayerFrame>
+                    ) : kind === "quiz" ? (
+                      <PlayerFrame kind="quiz">
+                        {(() => {
+                          const hasDraft = !!activeModuleId && hasQuizDraft(courseId, activeModuleId, activeLesson.id);
+                          const attempts = activeModuleId ? getQuizAttempts(courseId, activeModuleId, activeLesson.id) : 0;
+                          void draftTick;
+                          const ctaLabel = hasDraft ? "Continue Test" : attempts > 0 ? "Retake Test" : "Start Test";
+                          const draft = activeModuleId && loadQuizDraft(courseId, activeModuleId, activeLesson.id);
+                          const timeLabel = draft
+                            ? `${Math.floor(draft.timeLeftSeconds / 60)}:${(draft.timeLeftSeconds % 60).toString().padStart(2, "0")} remaining`
+                            : activeLesson.duration && activeLesson.duration > 0
+                              ? `${activeLesson.duration} min limit`
+                              : "15 min limit";
+                          return (
+                            <>
+                              <div className="scp-exam">
                                 <div>
-                                  <h3 className="text-lg font-semibold">{activeLesson.title}</h3>
-                                  <p className="text-sm text-muted-foreground mt-1">
-                                    MCQ Assignment — opens in a secure new tab
-                                  </p>
+                                  <h3>{activeLesson.title}</h3>
+                                  <p>MCQ Assignment — opens in a secure new tab</p>
                                 </div>
-                                {hasDraft ? (
-                                  <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 shrink-0">
-                                    In progress
-                                  </Badge>
-                                ) : attempts > 0 ? (
-                                  <Badge className="bg-green-100 text-green-800 hover:bg-green-100 shrink-0">
-                                    Attempted ({attempts})
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="shrink-0">
-                                    Not taken
-                                  </Badge>
-                                )}
-                              </div>
-
-                              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                                <span className="inline-flex items-center gap-1.5">
-                                  <FileText className="h-4 w-4" />
-                                  {parseLessonQuizData(activeLesson)?.questions?.length ??
-                                    0}{" "}
-                                  questions
-                                </span>
-                                <span className="inline-flex items-center gap-1.5">
-                                  <Clock className="h-4 w-4" />
-                                  {(() => {
-                                    const draft =
-                                      activeModuleId &&
-                                      loadQuizDraft(courseId, activeModuleId, activeLesson.id);
-                                    if (draft) {
-                                      const m = Math.floor(draft.timeLeftSeconds / 60);
-                                      const s = draft.timeLeftSeconds % 60;
-                                      return `${m}:${s.toString().padStart(2, "0")} remaining`;
-                                    }
-                                    return activeLesson.duration && activeLesson.duration > 0
-                                      ? `${activeLesson.duration} min limit`
-                                      : "15 min limit";
-                                  })()}
+                                <span className={`scp-badge ${hasDraft ? "amber" : attempts > 0 ? "green" : "neutral"}`}>
+                                  {hasDraft ? "In progress" : attempts > 0 ? `Attempted (${attempts})` : "Not taken"}
                                 </span>
                               </div>
-
-                              <Button
-                                size="lg"
-                                className="w-full sm:w-auto bg-accent-brand text-white hover:opacity-90"
+                              <p className="scp-note">
+                                <FileText aria-hidden /> {parseLessonQuizData(activeLesson)?.questions?.length ?? 0} questions
+                                {" · "}
+                                <Clock aria-hidden /> {timeLabel}
+                              </p>
+                              <button
+                                type="button"
+                                className="scp-open"
                                 onClick={() => {
                                   if (!activeModuleId) return;
-                                  window.open(
-                                    `/student/quiz/${courseId}/${activeModuleId}/${activeLesson.id}`,
-                                    "_blank",
-                                    "noopener,noreferrer"
-                                  );
+                                  window.open(`/student/quiz/${courseId}/${activeModuleId}/${activeLesson.id}`, "_blank", "noopener,noreferrer");
                                 }}
                               >
-                                <Play className="h-4 w-4 mr-2" />
+                                <Play aria-hidden />
                                 {ctaLabel}
-                              </Button>
-                                  </>
-                                );
-                              })()}
-                            </div>
-                          ) : activeLesson.contentType === 'video' ? (
-                            <>
-                              <VideoComponent videoUrl={activeLesson.content} />
-                              <div className="prose prose-sm max-w-none mt-4">
-                                <div dangerouslySetInnerHTML={{ __html: activeLesson.description || 'No additional description provided.' }}></div>
-                              </div>
+                              </button>
                             </>
-                          ) : documentUrl ? (
-                            <div className="rounded-2xl border border-border bg-gradient-to-br from-brand-turquoise/10 to-brand-blue/10 p-6 space-y-4">
-                              <div className="flex items-start justify-between gap-4">
-                                <div>
-                                  <h3 className="text-lg font-semibold">{activeLesson.title}</h3>
-                                  <p className="text-sm text-muted-foreground mt-1">
-                                    Documentation — opens in a new tab
-                                  </p>
-                                </div>
-                                <Badge variant="outline" className="shrink-0 capitalize">
-                                  {activeLesson.contentType}
-                                </Badge>
-                              </div>
-
-                              {activeLesson.description ? (
-                                <div className="prose prose-sm max-w-none text-muted-foreground">
-                                  <div
-                                    dangerouslySetInnerHTML={{
-                                      __html: activeLesson.description,
-                                    }}
-                                  />
-                                </div>
-                              ) : null}
-
-                              <Button
-                                size="lg"
-                                className="w-full sm:w-auto bg-accent-brand text-white hover:opacity-90"
-                                onClick={() => {
-                                  window.open(documentUrl, "_blank", "noopener,noreferrer");
-                                }}
-                              >
-                                <ExternalLink className="h-4 w-4 mr-2" />
-                                Open Document
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="prose prose-sm max-w-none">
-                              <div dangerouslySetInnerHTML={{ __html: activeLesson.content }}></div>
-                            </div>
-                          )}
-                        </CardContent>
-                        <CardFooter className="flex justify-between border-t pt-6">
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              const currentIndex = (lessons as any[]).findIndex(l => l.id === activeLessonId);
-                              if (currentIndex > 0) {
-                                setActiveLessonId((lessons as any[])[currentIndex - 1].id);
-                              }
-                            }}
-                            disabled={
-                              (lessons as any[]).findIndex(l => l.id === activeLessonId) === 0
-                            }
-                          >
-                            Previous Lesson
-                          </Button>
-                          
-                          <div className="flex space-x-2">
-                            {activeLesson.contentType !== "quiz" && (
-                              <Button
-                                onClick={() => markLessonComplete(activeLesson.id)}
-                                variant="outline"
-                                className="gap-2"
-                              >
-                                <CheckCircle2 className="h-4 w-4" />
-                                Mark as Complete
-                              </Button>
-                            )}
-                            
-                            <Button
-                              onClick={() => {
-                                const currentIndex = (lessons as any[]).findIndex(l => l.id === activeLessonId);
-                                if (currentIndex < (lessons as any[]).length - 1) {
-                                  setActiveLessonId((lessons as any[])[currentIndex + 1].id);
-                                }
-                              }}
-                              disabled={
-                                (lessons as any[]).findIndex(l => l.id === activeLessonId) === 
-                                (lessons as any[]).length - 1
-                              }
-                            >
-                              Next Lesson
-                            </Button>
-                          </div>
-                        </CardFooter>
-                      </Card>
+                          );
+                        })()}
+                      </PlayerFrame>
+                    ) : documentUrl ? (
+                      <PlayerFrame kind="doc">
+                        <h3>{activeLesson.title}</h3>
+                        <p className="scp-note">Documentation — opens in a new tab</p>
+                        <iframe src={documentUrl} title={activeLesson.title} />
+                        <button type="button" className="scp-open" onClick={() => window.open(documentUrl, "_blank", "noopener,noreferrer")}>
+                          <ExternalLink aria-hidden />
+                          Open Document
+                        </button>
+                      </PlayerFrame>
+                    ) : (
+                      <PlayerFrame kind="doc">
+                        <div dangerouslySetInnerHTML={{ __html: activeLesson.content }} />
+                      </PlayerFrame>
                     )}
+
+                    {kind === "video" && (
+                      <div className="scp-note">
+                        <div dangerouslySetInnerHTML={{ __html: activeLesson.description || "No additional description provided." }} />
+                      </div>
+                    )}
+                    {documentUrl && activeLesson.description ? (
+                      <div className="scp-note">
+                        <div dangerouslySetInnerHTML={{ __html: activeLesson.description }} />
+                      </div>
+                    ) : null}
+
+                    <div className="scp-after">
+                      <div className="scp-after-top">
+                        <div className="scp-meta">
+                          <span className={`scp-kind ${kindTone}`}>{kindLabel}</span>
+                          <span>Module {moduleNumber} · Lesson {Math.max(lessonIndex + 1, 1)} of {(lessons as any[]).length}</span>
+                        </div>
+                        <LessonActions
+                          completed={completed}
+                          showComplete={kind !== "quiz"}
+                          pending={updateProgressMutation.isPending}
+                          atStart={atStart}
+                          atEnd={atEnd}
+                          onComplete={() => markLessonComplete(activeLesson.id)}
+                          onPrevious={() => goLesson(-1)}
+                          onNext={() => goLesson(1)}
+                        />
+                      </div>
+                      <h2>
+                        {lessonRest ? `${lessonRest} ` : ""}
+                        <i>{lessonLast}</i>
+                      </h2>
+                    </div>
                   </>
-                ) : (
-                  <Card className="backdrop-blur-sm bg-white/70 border border-white/20 shadow-lg">
-                    <CardContent className="flex flex-col items-center justify-center p-12 text-center">
-                      <BookOpen className="h-12 w-12 text-gray-400 mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-1">
-                        Select a Module
-                      </h3>
-                      <p className="text-gray-500">
-                        Choose a module from the left to start learning
-                      </p>
-                    </CardContent>
-                  </Card>
                 )}
               </div>
             </div>
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="exams" className="space-y-4">
-            <Card className="backdrop-blur-sm bg-white/70 border border-white/20 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ClipboardList className="h-5 w-5 text-primary" />
-                  Course Exams
-                </CardTitle>
-                <CardDescription>
-                  Written exams for this course open in a new tab. Each exam can be submitted only once.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {courseExams.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-muted-foreground">
-                    No exams published for this course yet.
-                  </p>
-                ) : (
-                  courseExams.map((exam) => {
-                    const attempted = (examAttempts as any[]).some(
-                      (a) => Number(a.examId) === Number(exam.id) && a.completedAt
-                    );
-                    const inProgress = (examAttempts as any[]).some(
-                      (a) => Number(a.examId) === Number(exam.id) && !a.completedAt
-                    );
-                    const closed = exam.acceptingResponses === false;
-                    const canStart = !attempted && !closed;
-                    const label = attempted
-                      ? "Attempted"
-                      : closed
-                        ? "Unavailable"
-                        : inProgress
-                          ? "Continue Exam"
-                          : "Start Exam";
-
-                    return (
-                      <div
-                        key={exam.id}
-                        className="flex flex-col gap-3 rounded-xl border border-border bg-white/80 p-4 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <FileText className="h-4 w-4 shrink-0 text-primary" />
-                            <p className="truncate font-semibold text-foreground">{exam.title}</p>
-                          </div>
-                          <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                            {exam.description || "No description"}
-                            {exam.duration ? ` · ${exam.duration} min` : ""}
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Opens in a new tab · one attempt only
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          {attempted ? (
-                            <Badge className="rounded-full border-slate-200 bg-slate-100 text-slate-800">
-                              Attempted
-                            </Badge>
-                          ) : closed ? (
-                            <Badge className="rounded-full border-red-200 bg-red-100 text-red-800">
-                              Closed
-                            </Badge>
-                          ) : inProgress ? (
-                            <Badge className="rounded-full border-amber-200 bg-amber-100 text-amber-800">
-                              In progress
-                            </Badge>
-                          ) : (
-                            <Badge className="rounded-full border-green-200 bg-green-100 text-green-800">
-                              Available
-                            </Badge>
-                          )}
-                          <Button
-                            type="button"
-                            size="sm"
-                            className="gap-1.5 rounded-xl"
-                            variant={canStart ? "default" : "outline"}
-                            disabled={!canStart}
-                            onClick={() => {
-                              if (!canStart) {
-                                toast({
-                                  title: attempted ? "Already attempted" : "Cannot start exam",
-                                  description: attempted
-                                    ? "You already submitted this exam. Only one attempt is allowed."
-                                    : "This exam is not available.",
-                                  variant: "destructive",
-                                });
-                                return;
-                              }
-                              window.open(
-                                `/student/take-exam/${exam.id}`,
-                                "_blank",
-                                "noopener,noreferrer"
-                              );
-                            }}
-                          >
-                            {label}
-                            {canStart ? <ExternalLink className="h-3.5 w-3.5" /> : null}
-                          </Button>
-                        </div>
+        {activeTab === "exams" && (
+          <div className="scp-panel" role="tabpanel" id="scp-panel-exams" aria-labelledby="scp-tab-exams">
+            <section className="scp-block">
+              <h2>
+                <ClipboardList aria-hidden /> Course exams
+              </h2>
+              <p>Written exams for this course open in a new tab. Each exam can be submitted only once.</p>
+              {courseExams.length === 0 ? (
+                <p>No exams published for this course yet.</p>
+              ) : (
+                courseExams.map((exam) => {
+                  const attempted = (examAttempts as any[]).some((a) => Number(a.examId) === Number(exam.id) && a.completedAt);
+                  const inProgress = (examAttempts as any[]).some((a) => Number(a.examId) === Number(exam.id) && !a.completedAt);
+                  const closed = exam.acceptingResponses === false;
+                  const canStart = !attempted && !closed;
+                  const label = attempted ? "Attempted" : closed ? "Unavailable" : inProgress ? "Continue Exam" : "Start Exam";
+                  return (
+                    <div key={exam.id} className="scp-exam">
+                      <div>
+                        <strong>{exam.title}</strong>
+                        <p>
+                          {exam.description || "No description"}
+                          {exam.duration ? ` · ${exam.duration} min` : ""}
+                        </p>
+                        <p>Opens in a new tab · one attempt only</p>
                       </div>
-                    );
-                  })
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                      <div className="scp-nav">
+                        <span className={`scp-badge ${attempted ? "neutral" : closed ? "rose" : inProgress ? "amber" : "green"}`}>
+                          {attempted ? "Attempted" : closed ? "Closed" : inProgress ? "In progress" : "Available"}
+                        </span>
+                        <button
+                          type="button"
+                          className={canStart ? "scp-open" : "scp-prev"}
+                          disabled={!canStart}
+                          onClick={() => {
+                            if (!canStart) {
+                              toast({
+                                title: attempted ? "Already attempted" : "Cannot start exam",
+                                description: attempted
+                                  ? "You already submitted this exam. Only one attempt is allowed."
+                                  : "This exam is not available.",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                            window.open(`/student/take-exam/${exam.id}`, "_blank", "noopener,noreferrer");
+                          }}
+                        >
+                          {label}
+                          {canStart ? <ExternalLink aria-hidden /> : null}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </section>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

@@ -63,13 +63,15 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   const syncedDash = location === "/" || location.startsWith("/admin/dashboard");
   const courseLibrary = location === "/admin/courses";
+  const coursePlayer = /^\/student\/my-courses\/\d+/.test(location);
+  const flushDark = courseLibrary || coursePlayer;
   const darkShell = syncedDash || courseLibrary;
   const initials =
     `${user?.firstName?.charAt(0) || ""}${user?.lastName?.charAt(0) || ""}`.toUpperCase() ||
     "U";
 
   return (
-    <div className={cn("app-shell flex h-screen overflow-hidden bg-background", darkShell && "dash-app", courseLibrary && "course-shell")}>
+    <div className={cn("app-shell flex h-screen overflow-hidden bg-background", darkShell && "dash-app", flushDark && "course-shell")}>
       <Sidebar
         mobileOpen={isMobile && mobileOpen}
         onMobileClose={closeMobile}
@@ -80,11 +82,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
       <div
         className={cn(
           "main-content-premium flex min-h-0 min-w-0 flex-1 flex-col transition-[width,margin] duration-300 ease-out",
-          darkShell && !courseLibrary && "gap-3 py-3 pr-3",
-          darkShell && !courseLibrary && (isMobile ? "pl-3" : "pl-0")
+          darkShell && !flushDark && "gap-3 py-3 pr-3",
+          darkShell && !flushDark && (isMobile ? "pl-3" : "pl-0")
         )}
       >
-        {!courseLibrary && (
+        {!flushDark && (
         <header
           className={cn(
             "glass-appbar z-30 shrink-0",
@@ -210,6 +212,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
               "w-full min-w-0",
               courseLibrary
                 ? "course-library"
+                : coursePlayer
+                  ? "scp-shell"
                 : syncedDash
                   ? "flex h-full min-h-0 min-w-0 flex-col"
                   : darkShell
@@ -221,7 +225,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
         </main>
 
-        {!courseLibrary && (
+        {!flushDark && (
         <footer
           className={cn(
             "z-20 flex shrink-0 items-center justify-between px-3 sm:px-4",
