@@ -1563,7 +1563,10 @@
 .ced-new-q { margin-top: 12px; }
 .ced-quiz-pick { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; margin-top: 10px; }
 
-.ced-pop { border: 1px solid var(--border); background: var(--field); color: var(--text); }
+.ced-pop { --accent: 240 8% 20%; --accent-foreground: 250 30% 96%; border: 1px solid var(--border); background: var(--field); color: #f3f2fa; }
+.ced-pop [role="option"] { border-radius: 10px; color: #f3f2fa; }
+.ced-pop [role="option"]:focus,
+.ced-pop [role="option"][data-highlighted] { background: #22222f; color: #f3f2fa; }
 .ced-quiz-dialog { border: 1px solid var(--border-strong); border-radius: 24px; background: var(--dialog); color: var(--text); }
 .ced-quiz-title { display: flex; align-items: center; gap: 8px; }
 
