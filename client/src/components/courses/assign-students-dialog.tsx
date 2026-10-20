@@ -42,7 +42,7 @@ function subline(student: AssignStudent, name: string) {
   const parts = [student.username, student.email]
     .map((value) => value?.trim())
     .filter((value): value is string => Boolean(value));
-  const unique = [...new Set(parts)].filter(
+  const unique = Array.from(new Set(parts)).filter(
     (value) => value.toLowerCase() !== name.trim().toLowerCase()
   );
   return unique.length ? unique.join(" · ") : null;
@@ -103,7 +103,7 @@ export function AssignStudentsDialog({
     }
   }, [open]);
 
-  const keepLocked = (ids: number[]) => Array.from(new Set([...ids.map(Number), ...locked]));
+  const keepLocked = (ids: number[]) => Array.from(new Set(ids.map(Number).concat(Array.from(locked))));
 
   const toggle = (id: number) => {
     if (locked.has(id)) return;
