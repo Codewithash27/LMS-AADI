@@ -1,5 +1,4 @@
 ﻿import { useState, useEffect, useMemo } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -10,7 +9,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import {
   Trash,
   Plus,
@@ -24,6 +22,8 @@ import {
   PenLine,
   ListChecks,
   Check,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   OPTION_LETTERS,
@@ -48,13 +48,14 @@ import {
   FormMessage,
   FormDescription,
 } from "@/components/ui/form";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import {
-  CreateFormDialog,
-  CreateFormFooter,
-  FormSection,
-  createFormControlClass,
-  createFormLabelClass,
-} from "@/components/ui/create-form-dialog";
+  ExamStepRail,
+  examStepOrder,
+  EXAM_STEP_FIELDS,
+  EXAM_STEP_HEADINGS,
+  type ExamEditorStep,
+} from "@/components/exams/ExamStepRail";
 
 const EXAM_FORM_ID = "exam-editor-form";
 
@@ -151,7 +152,15 @@ export default function ExamEditor({
   const [isParsingPdf, setIsParsingPdf] = useState(false);
   const [uploadingImageQuestionId, setUploadingImageQuestionId] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [step, setStep] = useState<ExamEditorStep>("basics");
+  const [stepErrors, setStepErrors] = useState<Partial<Record<ExamEditorStep, boolean>>>({});
   const isEditing = !!exam?.id;
+  const editorMode = isEditing ? "edit" : "create";
+  const steps = examStepOrder(editorMode);
+  const stepIndex = Math.max(0, steps.indexOf(step)) + 1;
+  const totalSteps = steps.length;
+  const isFirstStep = step === steps[0];
+  const isLastStep = step === steps[steps.length - 1];
 
   const { data: fetchedExam, isLoading: isLoadingExam } = useQuery({
     queryKey: [`/api/exams/${exam?.id}`],
@@ -228,6 +237,13 @@ export default function ExamEditor({
       setQuestions([]);
     }
   }, [fetchedExam, exam?.id, open, form]);
+
+  useEffect(() => {
+    if (open) {
+      setStep("basics");
+      setStepErrors({});
+    }
+  }, [open, exam?.id]);
 
   useEffect(() => {
     if (!exam?.id || !examQuestions) return;
@@ -578,7 +594,63 @@ export default function ExamEditor({
 
   const isLoading = (isLoadingExam || isLoadingQuestions) && isEditing;
 
+  const watchedTitle = form.watch("title");
+  const watchedCourseId = form.watch("courseId");
+  const watchedDuration = form.watch("duration");
+  const watchedLive = form.watch("acceptingResponses");
+
+  const courseLabel =
+    courses.find((c) => String(c.id) === watchedCourseId)?.title ?? "Not set";
+
+  const goToStep = (next: ExamEditorStep) => {
+    if (steps.includes(next)) setStep(next);
+  };
+
+  const goNext = async () => {
+    const fields = EXAM_STEP_FIELDS[step];
+    if (fields?.length) {
+      const ok = await form.trigger(fields);
+      if (!ok) {
+        setStepErrors((prev) => ({ ...prev, [step]: true }));
+        toast({
+          title: "Fix this step first",
+          description: "Fill in the required fields before you continue.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setStepErrors((prev) => ({ ...prev, [step]: false }));
+    }
+    if (step === "source" && questionSource === "pdf" && pdfPool.length === 0) {
+      toast({
+        title: "Upload a file",
+        description: "Choose a PDF or Word file, or switch to typing questions.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const idx = steps.indexOf(step);
+    if (idx >= 0 && idx < steps.length - 1) setStep(steps[idx + 1]);
+  };
+
+  const goBack = () => {
+    const idx = steps.indexOf(step);
+    if (idx > 0) setStep(steps[idx - 1]);
+  };
+
   const onInvalid = (errors: typeof form.formState.errors) => {
+    const basicsKeys = EXAM_STEP_FIELDS.basics ?? [];
+    const sourceKeys = EXAM_STEP_FIELDS.source ?? [];
+    const errKeys = Object.keys(errors);
+    if (errKeys.some((k) => basicsKeys.includes(k as keyof ExamFormValues))) {
+      setStep("basics");
+      setStepErrors((prev) => ({ ...prev, basics: true }));
+    } else if (errKeys.some((k) => sourceKeys.includes(k as keyof ExamFormValues))) {
+      if (steps.includes("source")) setStep("source");
+      setStepErrors((prev) => ({ ...prev, source: true }));
+    } else {
+      setStep("questions");
+    }
     const firstKey = Object.keys(errors)[0] as keyof ExamFormValues | undefined;
     const firstErr = firstKey ? errors[firstKey] : undefined;
     const msg =
@@ -593,70 +665,67 @@ export default function ExamEditor({
   };
 
   return (
-    <CreateFormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={isEditing ? "Edit Exam" : "Create New Exam"}
-      description={
-        isEditing
-          ? "Update the details and questions for this exam."
-          : "Fill in the information below to create a new exam with questions."
-      }
-      icon={<ClipboardList className="h-6 w-6 text-white" />}
-      footer={
-        <CreateFormFooter
-          formId={EXAM_FORM_ID}
-          submitType="button"
-          onSubmit={() => void form.handleSubmit(onSubmit, onInvalid)()}
-          onCancel={() => onOpenChange(false)}
-          submitLabel={isEditing ? "Update Exam" : "Create Exam"}
-          pendingLabel="Saving..."
-          isPending={isSaving}
-          submitDisabled={isLoading}
-        />
-      }
-    >
-      {isLoading ? (
-        <div className="flex h-48 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        </div>
-      ) : (
-        <Form {...form}>
-          <form
-            id={EXAM_FORM_ID}
-            onSubmit={form.handleSubmit(onSubmit, onInvalid)}
-            className="space-y-6"
-          >
-            <FormSection
-              title="Basic details"
-              description="Name, course association, time limit, and response availability"
-            >
-              <div className="space-y-4">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="ced exd">
+        <header className="ced-head">
+          <span className="ced-mark" aria-hidden>
+            <ClipboardList strokeWidth={2.2} />
+          </span>
+          <div className="min-w-0">
+            <DialogTitle className="ced-h1">
+              {isEditing ? "Edit" : "Create"} <i>exam</i>
+            </DialogTitle>
+            <DialogDescription className="ced-sub">
+              {isEditing
+                ? "Update the details and questions for this exam."
+                : "Fill in the information below to create a new exam with questions."}
+            </DialogDescription>
+          </div>
+          <button type="button" className="ced-close" aria-label="Close" onClick={() => onOpenChange(false)}>
+            <X strokeWidth={2} />
+          </button>
+        </header>
+        <div className="ced-body">
+          <ExamStepRail mode={editorMode} step={step} stepErrors={stepErrors} onChange={goToStep} />
+          <div className="ced-main min-h-0 flex-1">
+            {isLoading ? (
+              <div className="flex h-48 flex-1 items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#D4FF3F] border-t-transparent" />
+              </div>
+            ) : (
+              <>
+                <p className="k shrink-0">
+                  Step {stepIndex} of {totalSteps}
+                </p>
+                <h2 className="ced-step-h shrink-0">
+                  {EXAM_STEP_HEADINGS[step].k} <i>{EXAM_STEP_HEADINGS[step].word}</i>
+                </h2>
+                <p className="ced-note shrink-0">{EXAM_STEP_HEADINGS[step].sub}</p>
+                <Form {...form}>
+                  <form
+                    id={EXAM_FORM_ID}
+                    className="exd-form"
+                    onSubmit={form.handleSubmit(onSubmit, onInvalid)}
+                  >
+                    <div className="ced-scroll slim-scroll">
+                      {step === "basics" && (
+                        <div className="ced-grid">
                 <FormField
                   control={form.control}
                   name="examType"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className={createFormLabelClass}>
-                        Exam Type <span className="text-red-500">*</span>
-                      </FormLabel>
+                    <FormItem className="ced-span">
+                      <FormLabel className="k">Exam type</FormLabel>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <button
                           type="button"
                           disabled={isSaving}
                           onClick={() => field.onChange("theory")}
-                          className={
-                            "rounded-xl border p-4 text-left transition-colors " +
-                            (field.value === "theory"
-                              ? "border-primary bg-primary/5"
-                              : "border-border bg-white hover:bg-muted/40")
-                          }
+                          className={"exd-pick" + (field.value === "theory" ? " on" : "")}
                         >
-                          <PenLine className="mb-2 h-5 w-5 text-primary" />
-                          <p className="text-sm font-semibold text-[#2D3748]">Theory based</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Students write answers; you grade them manually.
-                          </p>
+                          <PenLine />
+                          <strong>Theory</strong>
+                          <span>Students write answers. You grade them.</span>
                         </button>
                         <button
                           type="button"
@@ -679,18 +748,11 @@ export default function ExamEditor({
                               return next;
                             });
                           }}
-                          className={
-                            "rounded-xl border p-4 text-left transition-colors " +
-                            (field.value === "mcq"
-                              ? "border-primary bg-primary/5"
-                              : "border-border bg-white hover:bg-muted/40")
-                          }
+                          className={"exd-pick" + (field.value === "mcq" ? " on" : "")}
                         >
-                          <ListChecks className="mb-2 h-5 w-5 text-primary" />
-                          <p className="text-sm font-semibold text-[#2D3748]">MCQ based</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Multiple choice with one correct answer; auto-graded.
-                          </p>
+                          <ListChecks />
+                          <strong>Multiple choice</strong>
+                          <span>One correct answer. Graded automatically.</span>
                         </button>
                       </div>
                       <FormMessage />
@@ -702,14 +764,12 @@ export default function ExamEditor({
                   control={form.control}
                   name="title"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className={createFormLabelClass}>
-                        Exam Title <span className="text-red-500">*</span>
-                      </FormLabel>
+                    <FormItem className="ced-span">
+                      <FormLabel className="k">Title</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="e.g. Midterm Exam - Physics 101"
-                          className={createFormControlClass}
+                          className={"ced-input"}
                           disabled={isSaving}
                           {...field}
                         />
@@ -723,14 +783,12 @@ export default function ExamEditor({
                   control={form.control}
                   name="description"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className={createFormLabelClass}>
-                        Description <span className="text-red-500">*</span>
-                      </FormLabel>
+                    <FormItem className="ced-span">
+                      <FormLabel className="k">Description</FormLabel>
                       <FormControl>
                         <Textarea
                           placeholder="Provide instructions or scope for this exam..."
-                          className={createFormControlClass + " h-auto min-h-[80px] py-2.5"}
+                          className="ced-input ced-area"
                           rows={3}
                           disabled={isSaving}
                           {...field}
@@ -741,26 +799,24 @@ export default function ExamEditor({
                   )}
                 />
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="ced-span grid gap-4 sm:grid-cols-2">
                   <FormField
                     control={form.control}
                     name="courseId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className={createFormLabelClass}>
-                          Course <span className="text-red-500">*</span>
-                        </FormLabel>
+                        <FormLabel className="k">Course</FormLabel>
                         <Select
                           onValueChange={field.onChange}
                           value={field.value}
                           disabled={isSaving}
                         >
                           <FormControl>
-                            <SelectTrigger className={createFormControlClass}>
+                            <SelectTrigger className={"ced-input"}>
                               <SelectValue placeholder="Select course" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
+                          <SelectContent className="ced-pop">
                             {courses.map((course) => (
                               <SelectItem key={course.id} value={String(course.id)}>
                                 {course.title}
@@ -778,20 +834,18 @@ export default function ExamEditor({
                     name="batchId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className={createFormLabelClass}>
-                          Batch (Optional)
-                        </FormLabel>
+                        <FormLabel className="k">Batch</FormLabel>
                         <Select
                           onValueChange={field.onChange}
                           value={field.value ?? "none"}
                           disabled={isSaving}
                         >
                           <FormControl>
-                            <SelectTrigger className={createFormControlClass}>
+                            <SelectTrigger className={"ced-input"}>
                               <SelectValue placeholder="All batches in course" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
+                          <SelectContent className="ced-pop">
                             <SelectItem value="none">All batches in course</SelectItem>
                             {courseBatches.map((batch) => (
                               <SelectItem key={batch.id} value={String(batch.id)}>
@@ -807,15 +861,13 @@ export default function ExamEditor({
                   />
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="ced-span grid gap-4 sm:grid-cols-2">
                   <FormField
                     control={form.control}
                     name="duration"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className={createFormLabelClass}>
-                          Duration (minutes) <span className="text-red-500">*</span>
-                        </FormLabel>
+                        <FormLabel className="k">Duration (minutes)</FormLabel>
                         <FormControl>
                           <div className="relative">
                             <Clock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -823,7 +875,7 @@ export default function ExamEditor({
                               type="number"
                               min={1}
                               max={600}
-                              className={createFormControlClass + " pl-9"}
+                              className={"ced-input" + " pl-9"}
                               disabled={isSaving}
                               value={field.value ?? 60}
                               onChange={(e) => {
@@ -842,17 +894,14 @@ export default function ExamEditor({
                     control={form.control}
                     name="acceptingResponses"
                     render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-xl border border-border bg-white p-3.5 shadow-sm">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-sm font-semibold text-[#2D3748]">
-                            Accepting Responses
-                          </FormLabel>
-                          <p className="text-xs text-muted-foreground">
-                            Students can access and submit
-                          </p>
+                      <FormItem className="ced-enroll">
+                        <div>
+                          <FormLabel className="k">Accepting responses</FormLabel>
+                          <p>Students can open this exam and submit.</p>
                         </div>
                         <FormControl>
                           <Switch
+                            className="ced-switch"
                             checked={field.value}
                             onCheckedChange={field.onChange}
                             disabled={isSaving}
@@ -862,14 +911,11 @@ export default function ExamEditor({
                     )}
                   />
                 </div>
-              </div>
-            </FormSection>
+                        </div>
+                      )}
 
-            {!isEditing && (
-              <FormSection
-                title="Question source"
-                description="Choose whether to type questions manually or upload a PDF/Word document"
-              >
+                      {step === "source" && (
+                        <div className="space-y-4">
                 <FormField
                   control={form.control}
                   name="questionSource"
@@ -880,33 +926,21 @@ export default function ExamEditor({
                           type="button"
                           disabled={isSaving}
                           onClick={() => field.onChange("manual")}
-                          className={
-                            "rounded-xl border p-4 text-left transition-colors " +
-                            (field.value === "manual"
-                              ? "border-primary bg-primary/5"
-                              : "border-border bg-white hover:bg-muted/40")
-                          }
+                          className={"exd-pick" + (field.value === "manual" ? " on" : "")}
                         >
-                          <p className="text-sm font-semibold text-[#2D3748]">Manual entry</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Type questions & attach photos manually below.
-                          </p>
+                          <PenLine />
+                          <strong>Type them</strong>
+                          <span>Write each question in the list below.</span>
                         </button>
                         <button
                           type="button"
                           disabled={isSaving}
                           onClick={() => field.onChange("pdf")}
-                          className={
-                            "rounded-xl border p-4 text-left transition-colors " +
-                            (field.value === "pdf"
-                              ? "border-primary bg-primary/5"
-                              : "border-border bg-white hover:bg-muted/40")
-                          }
+                          className={"exd-pick" + (field.value === "pdf" ? " on" : "")}
                         >
-                          <p className="text-sm font-semibold text-[#2D3748]">Upload PDF / Word Document</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Parse questions and embedded images automatically.
-                          </p>
+                          <FileText />
+                          <strong>Upload a file</strong>
+                          <span>PDF or Word. Questions and images are read from the file.</span>
                         </button>
                       </div>
                       <FormMessage />
@@ -916,28 +950,26 @@ export default function ExamEditor({
 
                 {questionSource === "pdf" && (
                   <div className="mt-4 space-y-4">
-                    <div className="rounded-xl border border-dashed border-border bg-white p-4">
+                    <div className="exd-drop">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-start gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15">
-                            <FileText className="h-5 w-5 text-primary" />
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#D4FF3F]/15 text-[#D4FF3F]">
+                            <FileText className="h-5 w-5" />
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-[#2D3748]">
+                            <p className="text-sm font-bold text-[#F3F2FA]">
                               {pdfFileName || "No file selected"}
                             </p>
-                            <p className="text-xs text-muted-foreground">
-                              Supports PDF (.pdf) and Word (.docx) files with text & images.
-                            </p>
+                            <p className="text-[13px] text-[#A3A1B8]">PDF or Word, including images in the file.</p>
                             {examType === "mcq" && (
-                              <p className="mt-1 text-[11px] text-muted-foreground">
-                                Format: number each question, options as A) B) C) D), then Answer: B
+                              <p className="mt-1 text-[13px] text-[#A3A1B8]">
+                                Number each question, write A) B) C) D), then Answer: B
                               </p>
                             )}
                             {pdfPool.length > 0 && (
-                              <Badge className="mt-2 rounded-full border border-green-200 bg-green-100 text-[10px] font-bold uppercase tracking-wide text-green-800">
-                                {pdfPool.length} questions in pool
-                              </Badge>
+                              <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#3DDC97]">
+                                {pdfPool.length} questions found
+                              </p>
                             )}
                           </div>
                         </div>
@@ -953,24 +985,16 @@ export default function ExamEditor({
                               e.target.value = "";
                             }}
                           />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-11 gap-2 rounded-xl"
-                            disabled={isSaving || isParsingPdf}
-                            asChild
-                          >
-                            <span>
-                              {isParsingPdf ? (
-                                "Parsing..."
-                              ) : (
-                                <>
-                                  <Upload className="h-4 w-4" />
-                                  {pdfPool.length ? "Replace Document" : "Upload Document"}
-                                </>
-                              )}
-                            </span>
-                          </Button>
+                          <span className="exd-ghost">
+                            {isParsingPdf ? (
+                              "Reading file..."
+                            ) : (
+                              <>
+                                <Upload className="h-4 w-4" />
+                                {pdfPool.length ? "Replace file" : "Choose file"}
+                              </>
+                            )}
+                          </span>
                         </label>
                       </div>
                     </div>
@@ -982,15 +1006,13 @@ export default function ExamEditor({
                           name="questionCount"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className={createFormLabelClass}>
-                                Questions to pick randomly
-                              </FormLabel>
+                              <FormLabel className="k">How many to use</FormLabel>
                               <FormControl>
                                 <Input
                                   type="number"
                                   min={1}
                                   max={pdfPool.length}
-                                  className={createFormControlClass}
+                                  className={"ced-input"}
                                   disabled={isSaving}
                                   value={field.value ?? 1}
                                   onChange={(e) =>
@@ -1002,82 +1024,64 @@ export default function ExamEditor({
                                   }
                                 />
                               </FormControl>
-                              <FormDescription className="text-xs">
-                                Max {pdfPool.length} from uploaded document.
+                              <FormDescription className="text-[13px] text-[#A3A1B8]">
+                                Up to {pdfPool.length} from this file.
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                        <Button
+                        <button
                           type="button"
-                          variant="outline"
-                          className="h-11 gap-2 rounded-xl"
+                          className="exd-ghost"
                           disabled={isSaving}
                           onClick={() => applyRandomFromPool(questionCount)}
                         >
                           <Shuffle className="h-4 w-4" />
-                          Re-shuffle
-                        </Button>
+                          Shuffle again
+                        </button>
                       </div>
                     )}
                   </div>
                 )}
-              </FormSection>
-            )}
+                        </div>
+                      )}
 
-            <FormSection
-              title="Exam questions"
-              description={
-                questionSource === "pdf" && pdfPool.length > 0
-                  ? "Randomly selected from document — review questions & images before saving"
-                  : "Questions with optional diagram/photo attachment"
-              }
-            >
-              <div className="space-y-4">
+                      {step === "questions" && (
+                        <div className="space-y-4">
                 {questions.map((question, questionIndex) => (
-                  <div
-                    key={question.id}
-                    className="rounded-xl border border-border bg-white p-4 shadow-sm"
-                  >
-                    <div className="mb-3 flex items-start justify-between gap-2">
-                      <h5 className="text-sm font-semibold text-[#2D3748]">
-                        Question {questionIndex + 1}
-                      </h5>
-                      <Button
+                  <div key={question.id} className="exd-q">
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <h3>Question {questionIndex + 1}</h3>
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 text-[#A0AEC0] hover:text-red-500"
+                        className="exd-icon"
                         onClick={() => removeQuestion(question.id)}
                         disabled={isSaving}
                         aria-label="Remove question"
                       >
                         <Trash className="h-4 w-4" />
-                      </Button>
+                      </button>
                     </div>
 
-                    <label
-                      htmlFor={`question-${question.id}`}
-                      className={createFormLabelClass + " mb-1.5 block"}
-                    >
-                      Question Text
+                    <label htmlFor={`question-${question.id}`} className="k">
+                      Question
                     </label>
                     <Textarea
                       id={`question-${question.id}`}
                       value={question.text}
                       onChange={(e) => updateQuestionText(question.id, e.target.value)}
                       rows={2}
-                      className={createFormControlClass + " h-auto min-h-[72px] py-2.5"}
+                      className="ced-input ced-area"
                       disabled={isSaving}
                       placeholder="e.g. How many triangles are there in the diagram below?"
                     />
 
                     {examType === "mcq" && (
                       <div className="mt-4 space-y-2">
-                        <FormLabel className={createFormLabelClass}>Answer options</FormLabel>
-                        <p className="text-xs text-muted-foreground">
-                          Fill at least two options, then click a letter to mark the correct answer.
+                        <FormLabel className="k">Options</FormLabel>
+                        <p className="mb-2 text-[13px] text-[#A3A1B8]">
+                          Write at least two. Tap the letter to mark the correct one.
                         </p>
                         {(question.options ?? DEFAULT_MCQ_OPTIONS).map((opt, optIdx) => (
                           <div key={optIdx} className="flex items-center gap-2">
@@ -1086,12 +1090,7 @@ export default function ExamEditor({
                               disabled={isSaving}
                               title="Mark as correct"
                               onClick={() => setCorrectOption(question.id, optIdx)}
-                              className={
-                                "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold " +
-                                (question.correctOption === optIdx
-                                  ? "border-green-600 bg-green-600 text-white"
-                                  : "border-border bg-white text-muted-foreground hover:border-primary")
-                              }
+                              className={"exd-letter" + (question.correctOption === optIdx ? " on" : "")}
                             >
                               {question.correctOption === optIdx ? (
                                 <Check className="h-4 w-4" />
@@ -1102,7 +1101,7 @@ export default function ExamEditor({
                             <Input
                               value={opt}
                               disabled={isSaving}
-                              className={createFormControlClass}
+                              className={"ced-input"}
                               placeholder={`Option ${OPTION_LETTERS[optIdx]}`}
                               onChange={(e) => {
                                 const next = [...(question.options ?? DEFAULT_MCQ_OPTIONS)];
@@ -1111,52 +1110,44 @@ export default function ExamEditor({
                               }}
                             />
                             {(question.options ?? DEFAULT_MCQ_OPTIONS).length > 2 && (
-                              <Button
+                              <button
                                 type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-9 w-9 p-0"
+                                className="exd-icon"
                                 onClick={() => removeOptionFromQuestion(question.id, optIdx)}
                                 disabled={isSaving}
+                                aria-label="Remove option"
                               >
                                 <X className="h-4 w-4" />
-                              </Button>
+                              </button>
                             )}
                           </div>
                         ))}
                         {(question.options ?? DEFAULT_MCQ_OPTIONS).length < 6 && (
-                          <Button
+                          <button
                             type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-9 gap-1 rounded-xl"
+                            className="exd-ghost"
                             onClick={() => addOptionToQuestion(question.id)}
                             disabled={isSaving}
                           >
                             <Plus className="h-3.5 w-3.5" />
                             Add option
-                          </Button>
+                          </button>
                         )}
                       </div>
                     )}
 
                     {/* Question Image Attachment section */}
-                    <div className="mt-3.5 rounded-xl border border-border/80 bg-slate-50/50 p-3.5">
-                      <div className="flex items-center justify-between mb-2">
-                        <FormLabel className={createFormLabelClass + " flex items-center gap-1.5"}>
-                          <ImageIcon className="h-4 w-4 text-primary" />
-                          Question Image / Photo
-                        </FormLabel>
-                        {question.imageUrl && (
-                          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[11px] font-semibold">
-                            Image Attached
-                          </Badge>
-                        )}
+                    <div className="exd-photo">
+                      <div className="mb-2 flex items-center justify-between">
+                        <p className="k">Diagram</p>
+                        {question.imageUrl ? (
+                          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#3DDC97]">Attached</span>
+                        ) : null}
                       </div>
 
                       {question.imageUrl ? (
                         <div className="space-y-3">
-                          <div className="relative inline-block overflow-hidden rounded-xl border border-border bg-white p-2 shadow-sm">
+                          <div className="inline-block overflow-hidden rounded-2xl border border-white/10 bg-[#0A0A0F] p-2">
                             <img
                               src={question.imageUrl}
                               alt={`Question ${questionIndex + 1} diagram`}
@@ -1165,9 +1156,9 @@ export default function ExamEditor({
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2">
-                            <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-border bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-slate-50 transition-colors">
-                              <Upload className="h-3.5 w-3.5 text-gray-500" />
-                              <span>{uploadingImageQuestionId === question.id ? "Uploading..." : "Change Photo"}</span>
+                            <label className="exd-ghost cursor-pointer">
+                              <Upload className="h-3.5 w-3.5" />
+                              <span>{uploadingImageQuestionId === question.id ? "Uploading..." : "Change photo"}</span>
                               <input
                                 type="file"
                                 accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
@@ -1183,27 +1174,25 @@ export default function ExamEditor({
                               />
                             </label>
 
-                            <Button
+                            <button
                               type="button"
-                              variant="destructive"
-                              size="sm"
-                              className="h-8 gap-1.5 rounded-xl text-xs font-semibold"
+                              className="exd-ghost"
                               onClick={() => removeQuestionImage(question.id)}
                               disabled={isSaving}
                             >
                               <Trash className="h-3.5 w-3.5" />
-                              Remove Photo
-                            </Button>
+                              Remove photo
+                            </button>
                           </div>
                         </div>
                       ) : (
                         <div>
-                          <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-primary/50 bg-primary/5 px-4 py-2.5 text-xs font-bold text-primary shadow-sm hover:bg-primary/10 transition-all">
+                          <label className="exd-ghost cursor-pointer">
                             <ImageIcon className="h-4 w-4" />
                             <span>
                               {uploadingImageQuestionId === question.id
                                 ? "Uploading image..."
-                                : "Attach Image / Picture (PNG, JPG)"}
+                                : "Attach a diagram"}
                             </span>
                             <input
                               type="file"
@@ -1219,48 +1208,101 @@ export default function ExamEditor({
                               }}
                             />
                           </label>
-                          <p className="mt-1.5 text-[11px] text-muted-foreground">
-                            Supports PNG, JPG, JPEG, WEBP files. Appears directly with question.
-                          </p>
+                          <p className="mt-2 text-[13px] text-[#A3A1B8]">PNG, JPG, or WEBP. It shows with the question.</p>
                         </div>
                       )}
                     </div>
 
                     {examType === "theory" && question.modelAnswer ? (
-                      <p className="mt-3 rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
-                        <span className="font-semibold text-[#2D3748]">Model answer: </span>
+                      <p className="mt-3 rounded-2xl bg-[#13131E] px-3 py-2 text-[13px] text-[#A3A1B8]">
+                        <span className="font-bold text-[#F3F2FA]">Model answer: </span>
                         {question.modelAnswer}
                       </p>
                     ) : examType === "theory" &&
                       question.options &&
                       question.options.filter((o) => o.trim()).length >= 2 ? (
-                      <p className="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                        Parsed options will be appended to the question text when you save this
-                        theory exam.
+                      <p className="mt-3 rounded-2xl border border-[#FFB547]/40 bg-[#FFB547]/10 px-3 py-2 text-[13px] text-[#FFB547]">
+                        These options will be added to the question text when you save.
                       </p>
                     ) : examType === "theory" ? (
-                      <p className="mt-3 text-xs text-muted-foreground">
-                        Students will provide written answers.
-                      </p>
+                      <p className="mt-3 text-[13px] text-[#A3A1B8]">Students write their answer.</p>
                     ) : null}
                   </div>
                 ))}
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-11 gap-2 rounded-xl border-border font-semibold text-[#2D3748]"
-                  onClick={addQuestion}
-                  disabled={isSaving}
-                >
+                <button type="button" className="exd-ghost" onClick={addQuestion} disabled={isSaving}>
                   <Plus className="h-4 w-4" />
-                  Add New Question
-                </Button>
-              </div>
-            </FormSection>
-          </form>
-        </Form>
-      )}
-    </CreateFormDialog>
+                  Add question
+                </button>
+                        </div>
+                      )}
+                    </div>
+                  </form>
+                </Form>
+              </>
+            )}
+          </div>
+          <aside className="ced-preview exd-preview">
+            <p className="k">At a glance</p>
+            <p className="ced-live-note">Summary updates as you fill each step.</p>
+            <ul className="ced-summary">
+              <li>
+                <span>Title</span>
+                <b>{watchedTitle.trim() || "Untitled exam"}</b>
+              </li>
+              <li>
+                <span>Course</span>
+                <b>{courseLabel}</b>
+              </li>
+              <li>
+                <span>Type</span>
+                <b>{examType === "mcq" ? "Multiple choice" : "Theory"}</b>
+              </li>
+              <li>
+                <span>Duration</span>
+                <b>{watchedDuration ?? 60} min</b>
+              </li>
+              <li>
+                <span>Questions</span>
+                <b>{questions.length}</b>
+              </li>
+              <li>
+                <span>Live</span>
+                <b>{watchedLive ? "Yes" : "No"}</b>
+              </li>
+            </ul>
+          </aside>
+        </div>
+        <footer className="ced-foot exd-foot">
+          <button type="button" className="ced-cancel" onClick={() => onOpenChange(false)} disabled={isSaving}>
+            Cancel
+          </button>
+          <div className="exd-foot-actions">
+            {!isFirstStep && !isLoading ? (
+              <button type="button" className="ced-cancel" onClick={goBack} disabled={isSaving}>
+                <ChevronLeft strokeWidth={2.4} aria-hidden />
+                Back
+              </button>
+            ) : null}
+            {!isLastStep && !isLoading ? (
+              <button type="button" className="ced-submit" onClick={() => void goNext()} disabled={isSaving}>
+                Continue
+                <ChevronRight strokeWidth={2.4} aria-hidden />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="ced-submit"
+                disabled={isSaving || isLoading}
+                onClick={() => void form.handleSubmit(onSubmit, onInvalid)()}
+              >
+                <Check strokeWidth={2.4} aria-hidden />
+                {isSaving ? "Saving..." : isEditing ? "Update exam" : "Create exam"}
+              </button>
+            )}
+          </div>
+        </footer>
+      </DialogContent>
+    </Dialog>
   );
 }

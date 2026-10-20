@@ -1297,6 +1297,106 @@
 
 .ced > button { display: none; }
 
+.slim-scroll { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.28) transparent; }
+.slim-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.slim-scroll::-webkit-scrollbar-track { background: transparent; }
+.slim-scroll::-webkit-scrollbar-thumb { border-radius: 99px; background: rgba(255, 255, 255, 0.28); }
+.slim-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.45); }
+
+.ced.exd { width: min(1200px, calc(100vw - 32px)); }
+.ced.exd .ced-main { min-height: 0; overflow: hidden; }
+.ced.exd .ced-main > form.exd-form {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ced.exd .ced-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+.exd-foot { justify-content: space-between; }
+.exd-foot-actions { display: flex; gap: 12px; margin-left: auto; }
+.exd-preview { width: 280px; }
+.exd-block { margin: 0 0 28px; }
+.exd-block-h h2 { margin: 0; font-family: Fraunces, Georgia, serif; font-size: 28px; font-weight: 500; letter-spacing: -0.03em; }
+.exd-block-h h2 i { color: var(--accent); font-style: italic; }
+.exd-block-h p { margin: 6px 0 16px; color: var(--text-muted); }
+.exd-pick {
+  display: flex;
+  min-height: 112px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--field);
+  padding: 16px 18px;
+  text-align: left;
+  color: var(--text);
+}
+.exd-pick svg { width: 20px; height: 20px; margin-bottom: 6px; color: var(--accent); }
+.exd-pick strong { font-size: 15px; font-weight: 800; }
+.exd-pick span { color: var(--text-muted); font-size: 13px; line-height: 1.4; }
+.exd-pick.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--field)); }
+.exd-q { border: 1px solid var(--border); border-radius: 20px; background: var(--surface); padding: 16px; }
+.exd-q h3 { margin: 0; font-size: 15px; font-weight: 800; }
+.exd-letter {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: var(--field);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+.exd-letter.on { border-color: transparent; background: var(--green); color: #0a0a0f; }
+.exd-icon {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-muted);
+}
+.exd-icon:hover { color: var(--rose); }
+.exd-ghost {
+  display: inline-flex;
+  height: 40px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: transparent;
+  padding: 0 14px;
+  color: var(--text);
+  font-weight: 700;
+}
+.exd-drop {
+  border: 1px dashed var(--border-strong);
+  border-radius: 20px;
+  background: var(--field);
+  padding: 16px;
+}
+.exd-photo { margin-top: 14px; border: 1px solid var(--border); border-radius: 16px; background: var(--field); padding: 14px; }
+.exd .text-muted-foreground,
+.exd .text-destructive { color: var(--text-muted); }
+.exd p.text-destructive,
+.exd [role="alert"] { color: var(--rose) !important; }
+
 .ced-head,
 .ced-foot,
 .ced-rail,
@@ -1418,7 +1518,10 @@
 .ced-main { display: flex; min-width: 0; flex: 1; flex-direction: column; padding: 22px 28px 0; }
 .ced-main .k { padding: 0 0 8px; }
 .ced-step-h { margin-bottom: 18px; font-size: 30px; }
-.ced-scroll { min-height: 0; flex: 1; overflow: auto; padding-bottom: 24px; }
+.ced-scroll { min-height: 0; flex: 1; overflow: auto; padding-bottom: 24px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.28) transparent; }
+.ced-scroll::-webkit-scrollbar { width: 6px; }
+.ced-scroll::-webkit-scrollbar-track { background: transparent; }
+.ced-scroll::-webkit-scrollbar-thumb { border-radius: 99px; background: rgba(255, 255, 255, 0.28); }
 
 .ced-preview { width: 320px; flex-shrink: 0; overflow: hidden; border-left: 1px solid var(--border); padding: 22px; }
 .ced-preview .course-cover { height: 132px; }

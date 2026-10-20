@@ -278,7 +278,7 @@ export default function AdminExams() {
                 {activeCourse ? `filtering: ${activeCourse.name} · tap again to clear` : "tap a bar to filter"}
               </span>
             </div>
-            <div className="flex max-h-[280px] flex-col gap-3.5 overflow-y-auto pr-1 [scrollbar-color:rgba(255,255,255,0.28)_transparent] [scrollbar-width:thin]">
+            <div className="slim-scroll flex max-h-[280px] flex-col gap-3.5 overflow-y-auto pr-1">
               {courseBars.rows.length === 0 ? (
                 <p className="text-[#A3A1B8]">No courses yet.</p>
               ) : (
