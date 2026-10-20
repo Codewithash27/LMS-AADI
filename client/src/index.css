@@ -523,9 +523,14 @@
 }
 
 .scp-shell,
-.dash-home {
+.dash-home,
+.exam-board {
   min-height: 100%;
   background: #07070c;
+}
+.exam-board { padding: 32px 40px 48px 36px; color: #f3f2fa; font-family: Manrope, system-ui, sans-serif; font-size: 14px; }
+@media (max-width: 980px) {
+  .exam-board { padding: 20px; }
 }
 
 @media (min-width: 980px) {
