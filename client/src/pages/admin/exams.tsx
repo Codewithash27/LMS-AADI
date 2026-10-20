@@ -223,7 +223,7 @@ export default function AdminExams() {
         <header className="flex flex-wrap items-end justify-between gap-5">
           <div>
             <p className="mb-3.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#A3A1B8]">Academics / Exams</p>
-            <h1 className="font-[Fraunces,Georgia,serif] text-[72px] font-medium leading-none tracking-[-0.03em] max-[980px]:text-[44px]">
+            <h1 className="font-[Fraunces,Georgia,serif] text-[52px] font-medium leading-none tracking-[-0.03em] max-[980px]:text-[40px]">
               Exam <i className="text-[#D4FF3F]">board</i>
             </h1>
           </div>
@@ -250,11 +250,11 @@ export default function AdminExams() {
         </header>
 
         <section className="grid grid-cols-1 gap-5 min-[981px]:grid-cols-[5fr_7fr]">
-          <article className="relative flex min-h-[300px] flex-col justify-between overflow-hidden rounded-[28px] border border-white/[0.07] bg-[#0F0F18] p-[26px]">
+          <article className="relative flex flex-col justify-between overflow-hidden rounded-[28px] border border-white/[0.07] bg-[#0F0F18] p-[26px]">
             <div className="pointer-events-none absolute -right-[120px] -top-[120px] h-[340px] w-[340px] rounded-full bg-[radial-gradient(circle,rgba(212,255,63,0.22),transparent_65%)]" />
             <p className="relative text-[11px] font-bold uppercase tracking-[0.16em] text-[#A3A1B8]">Accepting responses</p>
             <div className="relative flex items-end gap-3.5">
-              <p className="font-[Fraunces,Georgia,serif] text-[150px] font-semibold leading-[0.9] tracking-[-0.04em] text-[#D4FF3F] max-[980px]:text-[96px]">
+              <p className="font-[Fraunces,Georgia,serif] text-[96px] font-semibold leading-[0.9] tracking-[-0.04em] text-[#D4FF3F] max-[980px]:text-[72px]">
                 {String(stats.published).padStart(2, "0")}
               </p>
               <p className="pb-2.5 text-base leading-snug text-[#A3A1B8]">
@@ -278,7 +278,7 @@ export default function AdminExams() {
                 {activeCourse ? `filtering: ${activeCourse.name} · tap again to clear` : "tap a bar to filter"}
               </span>
             </div>
-            <div className="flex flex-col gap-3.5">
+            <div className="flex max-h-[280px] flex-col gap-3.5 overflow-y-auto pr-1 [scrollbar-color:rgba(255,255,255,0.28)_transparent] [scrollbar-width:thin]">
               {courseBars.rows.length === 0 ? (
                 <p className="text-[#A3A1B8]">No courses yet.</p>
               ) : (
