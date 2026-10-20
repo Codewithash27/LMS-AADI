@@ -62,13 +62,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }, [logoutMutation]);
 
   const syncedDash = location === "/" || location.startsWith("/admin/dashboard");
-  const darkShell = syncedDash || location === "/admin/courses";
+  const courseLibrary = location === "/admin/courses";
+  const darkShell = syncedDash || courseLibrary;
   const initials =
     `${user?.firstName?.charAt(0) || ""}${user?.lastName?.charAt(0) || ""}`.toUpperCase() ||
     "U";
 
   return (
-    <div className={cn("flex h-screen overflow-hidden bg-background", darkShell && "dash-app")}>
+    <div className={cn("app-shell flex h-screen overflow-hidden bg-background", darkShell && "dash-app", courseLibrary && "course-shell")}>
       <Sidebar
         mobileOpen={isMobile && mobileOpen}
         onMobileClose={closeMobile}
@@ -79,10 +80,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
       <div
         className={cn(
           "main-content-premium flex min-h-0 min-w-0 flex-1 flex-col transition-[width,margin] duration-300 ease-out",
-          darkShell && "gap-3 py-3 pr-3",
-          darkShell && (isMobile ? "pl-3" : "pl-0")
+          darkShell && !courseLibrary && "gap-3 py-3 pr-3",
+          darkShell && !courseLibrary && (isMobile ? "pl-3" : "pl-0")
         )}
       >
+        {!courseLibrary && (
         <header
           className={cn(
             "glass-appbar z-30 shrink-0",
@@ -200,22 +202,26 @@ export default function MainLayout({ children }: MainLayoutProps) {
             )}
           </div>
         </header>
+        )}
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
           <div
             className={cn(
               "w-full min-w-0",
-              syncedDash
-                ? "flex h-full min-h-0 min-w-0 flex-col"
-                : darkShell
-                  ? "px-1 sm:px-2"
-                  : "px-3 py-3 sm:px-4 md:px-5 md:py-4"
+              courseLibrary
+                ? "course-library"
+                : syncedDash
+                  ? "flex h-full min-h-0 min-w-0 flex-col"
+                  : darkShell
+                    ? "px-1 sm:px-2"
+                    : "px-3 py-3 sm:px-4 md:px-5 md:py-4"
             )}
           >
             {children}
           </div>
         </main>
 
+        {!courseLibrary && (
         <footer
           className={cn(
             "z-20 flex shrink-0 items-center justify-between px-3 sm:px-4",
@@ -237,6 +243,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </p>
           <div className="hidden w-14 shrink-0 sm:block" />
         </footer>
+        )}
       </div>
     </div>
   );
