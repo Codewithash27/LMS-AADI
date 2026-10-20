@@ -1,27 +1,20 @@
 import { useEffect, useMemo } from "react";
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import StatCard from "@/components/dashboard/stat-card";
-import PerformanceMetrics from "@/components/dashboard/performance-metrics";
-import RecentActivities from "@/components/dashboard/recent-activities";
-import UpcomingExams from "@/components/dashboard/upcoming-exams";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  BookOpen,
-  GraduationCap,
-  Clock,
-  ArrowUpRight,
-  Mail,
-  UserRound,
-} from "lucide-react";
+import { ActivityTimeline } from "@/components/dashboard/ActivityTimeline";
+import { CourseGauge } from "@/components/dashboard/CourseGauge";
+import { CourseRow } from "@/components/dashboard/CourseRow";
+import { DashSkeleton, DashboardShell, EmptyNote } from "@/components/dashboard/DashboardShell";
+import { ExamCard } from "@/components/dashboard/ExamCard";
+import { PageGreeting } from "@/components/dashboard/PageGreeting";
+import { StatCard } from "@/components/dashboard/stat-card";
+import { TickRing } from "@/components/dashboard/TickRing";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Link } from "wouter";
 import { getCourseThumbnailSrc } from "@/lib/course-thumbnail";
 import { getProfilePhotoSrc } from "@/lib/profile-photo";
+import { getFirstName, getTimeGreeting } from "@/lib/greeting";
 
 type ActivityType = "new-course" | "exam-results" | "deadline" | "new-students" | "progress";
 
@@ -60,17 +53,17 @@ export default function StudentDashboard() {
     enabled: !!user,
   });
 
-  const { data: exams = [] } = useQuery<any[]>({
+  const { data: exams = [], isLoading: isLoadingExams } = useQuery<any[]>({
     queryKey: ["/api/exams"],
     enabled: !!user,
   });
 
-  const { data: examAttempts = [] } = useQuery<any[]>({
+  const { data: examAttempts = [], isLoading: isLoadingAttempts } = useQuery<any[]>({
     queryKey: ["/api/exam-attempts/user"],
     enabled: !!user,
   });
 
-  const { data: activityLogs = [] } = useQuery<any[]>({
+  const { data: activityLogs = [], isLoading: isLoadingActivity } = useQuery<any[]>({
     queryKey: ["/api/activity-logs/user"],
     enabled: !!user,
   });
@@ -354,219 +347,178 @@ export default function StudentDashboard() {
     return (open.length > 0 ? open : upcomingExams).slice(0, 3);
   }, [upcomingExams]);
 
+  const gaugeTones = ["green", "rose", "violet"] as const;
+  const firstName = getFirstName(`${user?.firstName || ""} ${user?.lastName || ""}`.trim() || user?.username || "there");
+  const loadingCourses = isLoadingEnrollments || isLoadingCourses;
+  const loadingExams = isLoadingExams || isLoadingAttempts;
+
   return (
     <DashboardLayout>
-      <div className="flex flex-col gap-3">
-        {/* Stats */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <StatCard
-            title="Enrolled Courses"
-            value={enrolledCourses.length}
-            icon={<BookOpen />}
-            iconColor="primary"
-          />
-          <StatCard
-            title="Completed Courses"
-            value={completedCoursesCount}
-            icon={<GraduationCap />}
-            iconColor="accent"
-          />
-          <StatCard
-            title="Upcoming Exams"
-            value={upcomingExams.filter((e) => e.urgencyLabel !== "Completed").length}
-            icon={<Clock />}
-            iconColor="secondary"
-          />
-        </div>
-
-        {/* Profile | Upcoming Exams | Performance — equal height */}
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 lg:items-stretch">
-          <Card className="flex h-full w-full flex-col overflow-hidden border border-white/20 bg-white/70 shadow-xl backdrop-blur-sm">
-            <div className="shrink-0 bg-accent-brand px-4 py-3">
-              <div className="flex items-center gap-2">
-                <div className="rounded-lg bg-white/20 p-1.5">
-                  <UserRound className="h-3.5 w-3.5 text-white" />
-                </div>
-                <p className="text-sm font-semibold text-white">My Profile</p>
-              </div>
-            </div>
-            <CardContent className="flex flex-1 flex-col px-4 py-3">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-11 w-11 border-2 border-white shadow-sm">
-                  {user?.profilePhoto ? (
-                    <AvatarImage
-                      src={getProfilePhotoSrc(user.profilePhoto) || undefined}
-                      alt=""
-                    />
-                  ) : null}
-                  <AvatarFallback className="bg-brand-turquoise text-sm font-semibold text-white">
-                    {profileInitials}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <h3 className="truncate text-sm font-semibold text-gray-900">
-                    {user?.firstName} {user?.lastName}
-                  </h3>
-                  <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                    {user?.role}
-                  </p>
-                  {user?.email ? (
-                    <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-gray-500">
-                      <Mail className="h-3 w-3 shrink-0" />
-                      <span className="truncate">{user.email}</span>
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="mt-3 grid grid-cols-3 gap-1.5 rounded-lg bg-cream-muted/70 p-2">
-                <div className="text-center">
-                  <p className="text-sm font-bold text-gray-900">{enrolledCourses.length}</p>
-                  <p className="text-[10px] text-muted-foreground">Courses</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-bold text-gray-900">{completedCoursesCount}</p>
-                  <p className="text-[10px] text-muted-foreground">Done</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-bold text-gray-900">{avgProgress}%</p>
-                  <p className="text-[10px] text-muted-foreground">Avg</p>
-                </div>
-              </div>
-
-              <div className="mt-2.5 space-y-1">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-muted-foreground">Overall progress</span>
-                  <span className="font-semibold text-gray-800">{avgProgress}%</span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-gray-200">
-                  <div
-                    className="h-full rounded-full bg-accent-brand"
-                    style={{
-                      width: `${Math.max(avgProgress, avgProgress > 0 ? 2 : 0)}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <Link href="/student/profile" className="mt-auto pt-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-full rounded-lg text-xs font-medium"
-                >
-                  View Profile
-                  <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          <UpcomingExams
-            exams={examsForWidget}
-            showScheduleButton={false}
-            fillHeight
-            className="h-full w-full"
-          />
-
-          <PerformanceMetrics
-            courses={coursePerformance}
-            fillHeight
-            className="h-full w-full"
-          />
-        </div>
-
-        {/* My Courses — full width, compact grid */}
-        <Card className="border border-white/20 bg-white/70 shadow-xl backdrop-blur-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 py-3 sm:px-5">
-            <div>
-              <CardTitle className="text-base">My Courses</CardTitle>
-              <CardDescription>Continue where you left off</CardDescription>
-            </div>
-            <Link href="/student/my-courses">
-              <Button variant="outline" size="sm" className="shrink-0 gap-1">
-                View All
-                <ArrowUpRight className="h-3.5 w-3.5" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent className="px-4 pb-4 pt-0 sm:px-5">
-            {isLoadingEnrollments || isLoadingCourses ? (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="animate-pulse rounded-xl border border-warm-border p-3">
-                    <div className="mb-2 h-4 w-2/3 rounded bg-gray-200" />
-                    <div className="mb-3 h-3 w-full rounded bg-gray-200" />
-                    <div className="h-2 rounded bg-gray-200" />
-                  </div>
-                ))}
-              </div>
-            ) : enrolledCourses.length === 0 ? (
-              <div className="py-6 text-center">
-                <BookOpen className="mx-auto mb-3 h-10 w-10 text-gray-400" />
-                <h3 className="mb-1 text-sm font-semibold text-gray-900">No courses assigned</h3>
-                <p className="text-xs text-gray-500">
-                  Your administrator will assign courses to your account.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {enrolledCourses.slice(0, 3).map((course: any) => {
-                  const enrollment = enrollments.find(
-                    (e) => Number(e.courseId) === Number(course.id)
-                  );
-                  const progress = enrollment?.progress || 0;
-                  const thumb = getCourseThumbnailSrc(course.thumbnail);
-
-                  return (
-                    <div
-                      key={course.id}
-                      className="flex flex-col rounded-xl border border-warm-border/80 bg-white/80 p-3"
-                    >
-                      <div className="flex items-start gap-2.5">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#0F766E]/15">
-                          {thumb ? (
-                            <img src={thumb} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            <BookOpen className="h-4 w-4 text-[#0F766E]" />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="truncate text-sm font-semibold text-gray-900">
-                            {course.title}
-                          </h3>
-                          <p className="mt-0.5 line-clamp-1 text-xs text-gray-500">
-                            {course.description || "No description"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="mt-3 flex items-center gap-2">
-                        <Progress value={progress} className="h-1.5 flex-1" />
-                        <span className="shrink-0 text-[11px] font-medium text-gray-600">
-                          {progress}%
-                        </span>
-                      </div>
-                      <Link href={`/student/my-courses/${course.id}`} className="mt-3">
-                        <Button size="sm" variant="outline" className="h-8 w-full gap-1 text-xs">
-                          Continue
-                          <ArrowUpRight className="h-3.5 w-3.5" />
-                        </Button>
-                      </Link>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Recent activity */}
-        <RecentActivities
-          activities={recentActivities}
-          className="w-full"
-          listMaxHeightClass="max-h-[220px] overflow-y-auto"
+      <DashboardShell>
+        <PageGreeting
+          workspace="Student"
+          greeting={getTimeGreeting().text}
+          firstName={firstName}
+          photo={getProfilePhotoSrc(user?.profilePhoto)}
+          initials={profileInitials}
+          profileHref="/student/profile"
         />
-      </div>
+
+        <div className="dsh-row a">
+          <article className="dsh-card dsh-glow dsh-profile">
+            <span className="k">My profile</span>
+            {loadingCourses ? (
+              <DashSkeleton tall />
+            ) : (
+              <>
+                <div className="dsh-who">
+                  {getProfilePhotoSrc(user?.profilePhoto) ? (
+                    <img src={getProfilePhotoSrc(user?.profilePhoto) || ""} alt="" />
+                  ) : (
+                    <span>{profileInitials}</span>
+                  )}
+                  <div>
+                    <h2>{user?.firstName} {user?.lastName}</h2>
+                    <p>{user?.email || user?.username}</p>
+                  </div>
+                </div>
+                <TickRing
+                  value={avgProgress}
+                  size={250}
+                  figure={`${avgProgress}%`}
+                  caption="Average progress"
+                  label="Average progress"
+                />
+                <p className="dsh-foot">
+                  {enrolledCourses.length} courses
+                  <span>{completedCoursesCount} completed</span>
+                </p>
+              </>
+            )}
+          </article>
+
+          <div className="dsh-stack">
+            <div className="dsh-kpis">
+              {loadingCourses || loadingExams ? (
+                <>
+                  <DashSkeleton /><DashSkeleton /><DashSkeleton />
+                </>
+              ) : (
+                <>
+                  <StatCard label="Enrolled courses" value={enrolledCourses.length} hint="Assigned to you" tone="violet" />
+                  <StatCard label="Completed courses" value={completedCoursesCount} hint="Finished" tone="cyan" />
+                  <StatCard
+                    label="Upcoming exams"
+                    value={upcomingExams.filter((exam) => exam.urgencyLabel !== "Attempted").length}
+                    hint="Still open"
+                    tone="amber"
+                  />
+                </>
+              )}
+            </div>
+            <article className="dsh-card">
+              <div className="dsh-card-head">
+                <h2>Course <i>performance</i></h2>
+              </div>
+              {loadingCourses ? (
+                <DashSkeleton />
+              ) : coursePerformance.length === 0 ? (
+                <EmptyNote>No courses assigned yet. Ask your administrator.</EmptyNote>
+              ) : (
+                <div className="dsh-gauges">
+                  {coursePerformance.slice(0, 3).map((course, index) => (
+                    <CourseGauge
+                      key={course.name}
+                      name={course.name}
+                      percentage={course.percentage}
+                      tone={gaugeTones[index % 3]}
+                    />
+                  ))}
+                </div>
+              )}
+            </article>
+          </div>
+        </div>
+
+        <div className="dsh-row c">
+          <article className="dsh-card">
+            <div className="dsh-card-head">
+              <h2>My <i>courses</i></h2>
+              <Link href="/student/my-courses">All courses →</Link>
+            </div>
+            {loadingCourses ? (
+              <DashSkeleton />
+            ) : enrolledCourses.length === 0 ? (
+              <EmptyNote>
+                No courses assigned yet. Ask your administrator.
+              </EmptyNote>
+            ) : (
+              enrolledCourses.slice(0, 3).map((course: any, index: number) => {
+                const enrollment = enrollments.find((item) => Number(item.courseId) === Number(course.id));
+                return (
+                  <CourseRow
+                    key={course.id}
+                    href={`/student/my-courses/${course.id}`}
+                    title={course.title}
+                    progress={Number(enrollment?.progress || 0)}
+                    thumbnail={getCourseThumbnailSrc(course.thumbnail)}
+                    tone={index}
+                    level={course.difficulty}
+                  />
+                );
+              })
+            )}
+          </article>
+
+          <article className="dsh-card">
+            <div className="dsh-card-head">
+              <h2>Upcoming <i>exams</i></h2>
+              <Link href="/student/upcoming-exams">All exams →</Link>
+            </div>
+            {loadingExams ? (
+              <DashSkeleton />
+            ) : examsForWidget.length === 0 ? (
+              <EmptyNote>No exams assigned yet.</EmptyNote>
+            ) : (
+              examsForWidget.map((exam) => {
+                const open = exam.urgencyLabel === "Open" || exam.urgencyLabel === "In progress";
+                return (
+                  <ExamCard
+                    key={exam.id}
+                    title={exam.title}
+                    detail={`${exam.subtitle} · ${exam.time}`}
+                    open={open}
+                    status={exam.urgencyLabel}
+                    action={open ? <Link href={`/student/take-exam/${exam.id}`} className="dsh-btn ghost">Take exam</Link> : null}
+                  />
+                );
+              })
+            )}
+          </article>
+        </div>
+
+        <article className="dsh-card">
+          <div className="dsh-card-head">
+            <h2>Recent <i>activity</i></h2>
+            <Link href="/student/results">Results & progress →</Link>
+          </div>
+          {isLoadingActivity ? (
+            <DashSkeleton />
+          ) : recentActivities.length === 0 ? (
+            <EmptyNote>No activity yet.</EmptyNote>
+          ) : (
+            <ActivityTimeline
+              items={recentActivities.slice(0, 3).map((item) => ({
+                id: item.id,
+                title: item.title,
+                description: item.description,
+                time: item.time,
+                tone: item.type === "exam-results" ? "green" : item.type === "new-course" ? "violet" : item.type === "progress" ? "lime" : "amber",
+              }))}
+            />
+          )}
+        </article>
+      </DashboardShell>
     </DashboardLayout>
   );
 }

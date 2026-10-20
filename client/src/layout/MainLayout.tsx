@@ -64,7 +64,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const syncedDash = location === "/" || location.startsWith("/admin/dashboard");
   const courseLibrary = location === "/admin/courses";
   const coursePlayer = /^\/student\/my-courses\/\d+/.test(location);
-  const flushDark = courseLibrary || coursePlayer;
+  const dashHome = syncedDash || location === "/student/dashboard";
+  const flushDark = courseLibrary || coursePlayer || dashHome;
   const darkShell = syncedDash || courseLibrary;
   const initials =
     `${user?.firstName?.charAt(0) || ""}${user?.lastName?.charAt(0) || ""}`.toUpperCase() ||
@@ -214,6 +215,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 ? "course-library"
                 : coursePlayer
                   ? "scp-shell"
+                  : dashHome
+                    ? "dash-home"
                 : syncedDash
                   ? "flex h-full min-h-0 min-w-0 flex-col"
                   : darkShell

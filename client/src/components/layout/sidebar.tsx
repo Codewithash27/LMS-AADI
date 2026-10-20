@@ -44,6 +44,8 @@ function pathMatches(location: string, href: string) {
   if (href === "/admin/dashboard" || href === "/student/dashboard") {
     return location === href || location === "/";
   }
+  if (href === "/student/my-courses" && location.startsWith("/student/quiz/")) return true;
+  if (href === "/student/upcoming-exams" && location.startsWith("/student/take-exam/")) return true;
   return location === href || location.startsWith(href + "/");
 }
 
@@ -317,9 +319,9 @@ export default function Sidebar({
   const initials =
     `${user.firstName?.charAt(0) || ""}${user.lastName?.charAt(0) || ""}`.toUpperCase() || "U";
   const profileHref = isAdmin ? "/admin/profile" : "/student/profile";
-  const footerIds = new Set(isAdmin ? ["theme-studio"] : []);
-  const mainItems = menuItems.filter((item) => item.id !== "profile" && !footerIds.has(item.id));
-  const footItems = menuItems.filter((item) => footerIds.has(item.id));
+  const mainItems = menuItems;
+  const footItems: NavItemData[] = [];
+  const roleLabel = user.role === "superadmin" ? "Super admin" : user.role === "admin" ? "Admin" : "Student";
   const photo = getProfilePhotoSrc(user.profilePhoto);
   const displayName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.username;
 
@@ -443,7 +445,7 @@ export default function Sidebar({
         {!collapsed && (
           <span className="rail-user-text">
             <span className="rail-user-name">{displayName}</span>
-            <span className="rail-user-email">{user.email || user.username}</span>
+            <span className="rail-user-email">{user.email ? `${roleLabel} · ${user.email}` : roleLabel}</span>
           </span>
         )}
       </Link>

@@ -1,15 +1,18 @@
 import { useEffect } from "react";
+import { Link } from "wouter";
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import ActivityChart from "@/components/dashboard/activity-chart";
-import PerformanceMetrics from "@/components/dashboard/performance-metrics";
-import RecentActivities from "@/components/dashboard/recent-activities";
-import UpcomingExams from "@/components/dashboard/upcoming-exams";
-import { Card, CardContent } from "@/components/ui/card";
-import { Users, BookOpen, Calendar, Target } from "lucide-react";
+import { ActivityTimeline } from "@/components/dashboard/ActivityTimeline";
+import { CapsuleProgress } from "@/components/dashboard/CapsuleProgress";
+import { DashSkeleton, DashboardShell, EmptyNote } from "@/components/dashboard/DashboardShell";
+import { ExamCard } from "@/components/dashboard/ExamCard";
+import { PageGreeting } from "@/components/dashboard/PageGreeting";
+import { StatCard } from "@/components/dashboard/stat-card";
+import { TickRing } from "@/components/dashboard/TickRing";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { cn } from "@/lib/utils";
+import { getFirstName, getTimeGreeting } from "@/lib/greeting";
+import { getProfilePhotoSrc } from "@/lib/profile-photo";
 
 type DashboardPayload = {
   stats: {
@@ -49,6 +52,20 @@ type DashboardPayload = {
   }[];
 };
 
+const ACTIVITY_TONE = {
+  "new-course": "violet",
+  "exam-results": "green",
+  deadline: "amber",
+  "new-students": "cyan",
+  progress: "lime",
+} as const;
+
+function scoreTone(percentage: number) {
+  if (percentage >= 30) return "lime";
+  if (percentage >= 15) return "amber";
+  return "rose";
+}
+
 export default function AdminDashboard() {
   const { user } = useAuth();
 
@@ -69,118 +86,165 @@ export default function AdminDashboard() {
   }, [user]);
 
   const stats = data?.stats;
-  const batchBars = (data?.batchProgress || []).map((batch) => ({
-    day: batch.name,
-    percentage: batch.percentage,
-    count: batch.enrolled,
-  }));
+  const batches = [...(data?.batchProgress || [])].sort(
+    (a, b) => b.percentage - a.percentage || a.name.localeCompare(b.name)
+  );
   const avgBatch =
-    batchBars.length === 0
+    batches.length === 0
       ? 0
-      : Math.round(batchBars.reduce((sum, batch) => sum + batch.percentage, 0) / batchBars.length);
-  const courses = (data?.coursePerformance || []).map((c) => ({
-    name: c.name,
-    percentage: c.percentage,
-  }));
+      : Math.round(batches.reduce((sum, batch) => sum + batch.percentage, 0) / batches.length);
+  const courses = data?.coursePerformance || [];
   const activities = data?.recentActivities || [];
   const exams = data?.upcomingExams || [];
-
-  const statItems = [
-    {
-      label: "Students",
-      value: isLoading || !stats ? "—" : stats.totalStudents,
-      icon: Users,
-      tone: "bg-gradient-to-br from-[#0F766E] to-[#0E7490]",
-    },
-    {
-      label: "Courses",
-      value: isLoading || !stats ? "—" : stats.activeCourses,
-      icon: BookOpen,
-      tone: "bg-gradient-to-br from-[#14B8A6] to-[#0F766E]",
-    },
-    {
-      label: "Exams",
-      value: isLoading || !stats ? "—" : stats.publishedExams,
-      icon: Calendar,
-      tone: "bg-gradient-to-br from-[#0E7490] to-[#155E75]",
-    },
-    {
-      label: "Completion",
-      value: isLoading || !stats ? "—" : `${stats.avgCompletion}%`,
-      icon: Target,
-      tone: "bg-gradient-to-br from-[#5B7C8D] to-[#334155]",
-    },
-  ];
+  const firstName = getFirstName(
+    `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || user?.username || "there"
+  );
+  const initials = `${user?.firstName?.charAt(0) || ""}${user?.lastName?.charAt(0) || ""}`.toUpperCase() || "A";
 
   return (
     <DashboardLayout>
-      {/* Full width of main pane — no max-width island / side gaps */}
-      <div className="dash-sync flex h-full min-h-0 w-full min-w-0 flex-col gap-2.5 sm:gap-3">
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-          {statItems.map((item) => (
-            <Card key={item.label} className="border border-[#D4DEE3] bg-white shadow-sm">
-              <CardContent className="flex items-center gap-2.5 p-2.5 sm:p-3">
-                <div className={cn("shrink-0 rounded-lg p-2 text-white shadow-sm", item.tone)}>
-                  <item.icon className="h-4 w-4" />
+      <DashboardShell>
+        <PageGreeting
+          workspace="Admin"
+          greeting={getTimeGreeting().text}
+          firstName={firstName}
+          photo={getProfilePhotoSrc(user?.profilePhoto)}
+          initials={initials}
+          profileHref="/admin/profile"
+        />
+
+        <div className="dsh-row a">
+          <article className="dsh-card dsh-glow dsh-complete">
+            <span className="k">Overall completion</span>
+            {isLoading || !stats ? (
+              <DashSkeleton tall />
+            ) : (
+              <>
+                <TickRing
+                  value={stats.avgCompletion}
+                  size={300}
+                  figure={`${stats.avgCompletion}%`}
+                  caption="Completion"
+                  label="Overall completion"
+                />
+                <p className="dsh-foot">
+                  Batches average {avgBatch}%
+                  <span>{stats.totalStudents} students</span>
+                </p>
+              </>
+            )}
+          </article>
+
+          <div className="dsh-stack">
+            <div className="dsh-kpis">
+              {isLoading || !stats ? (
+                <>
+                  <DashSkeleton /><DashSkeleton /><DashSkeleton />
+                </>
+              ) : (
+                <>
+                  <StatCard label="Students" value={stats.totalStudents} hint={`${batches.length} batches`} tone="violet" />
+                  <StatCard label="Courses" value={stats.activeCourses} hint="All active" tone="cyan" />
+                  <StatCard label="Exams" value={stats.totalExams} hint={`${stats.publishedExams} open now`} tone="amber" />
+                </>
+              )}
+            </div>
+            <article className="dsh-card dsh-batch-card">
+              <div className="dsh-card-head">
+                <h2>Batch <i>progress</i></h2>
+                {batches.length > 5 ? <Link href="/admin/batches">All {batches.length} →</Link> : null}
+              </div>
+              {isLoading ? (
+                <DashSkeleton />
+              ) : batches.length === 0 ? (
+                <EmptyNote>
+                  No active batches yet. <Link href="/admin/batches">View batches</Link>
+                </EmptyNote>
+              ) : (
+                <div className="dsh-scroll batches">
+                  <CapsuleProgress rows={batches} average={avgBatch} />
                 </div>
-                <div className="min-w-0">
-                  <p className="truncate text-[11px] text-muted-foreground">{item.label}</p>
-                  <p className="truncate text-lg font-bold leading-tight text-foreground">{item.value}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+              )}
+            </article>
+          </div>
         </div>
 
-        {/* Equal fixed heights — lists scroll inside, no staircase gap */}
-        <div className="grid min-h-[240px] flex-1 grid-cols-1 gap-2.5 lg:min-h-0 lg:grid-cols-3 lg:gap-3">
-          <div className="min-h-[220px] min-w-0 overflow-hidden lg:col-span-2 lg:h-full lg:min-h-0">
-            <ActivityChart
-              data={batchBars}
-              title="Batch progress"
-              hideTimeframe
-              wideBars
-              changePercentage={`${avgBatch}%`}
-              isPositiveChange
-              summaryTitle="Batches"
-              summaryHint="Average student progress"
-              emptyMessage="No active batches yet."
-              className="h-full"
-            />
-          </div>
-          <div className="min-h-[220px] min-w-0 overflow-hidden lg:h-full lg:min-h-0">
-            <PerformanceMetrics
-              courses={courses}
-              reportHref="/admin/reports"
-              fillHeight
-              className="h-full"
-            />
-          </div>
-        </div>
+        <div className="dsh-row b">
+          <article className="dsh-card">
+            <div className="dsh-card-head">
+              <h2>Course <i>performance</i></h2>
+              <Link href="/admin/reports">All {courses.length} →</Link>
+            </div>
+            {isLoading ? (
+              <DashSkeleton />
+            ) : courses.length === 0 ? (
+              <EmptyNote>No course progress yet.</EmptyNote>
+            ) : (
+              <div className="dsh-scroll">
+                <ul className="dsh-scores">
+                  {courses.map((course) => (
+                    <li key={course.id} className={scoreTone(course.percentage)}>
+                      <div>
+                        <span>{course.name}</span>
+                        <strong>{course.percentage}%</strong>
+                      </div>
+                      <span className="dsh-score-bar"><i style={{ width: `${Math.max(0, Math.min(100, course.percentage))}%` }} /></span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </article>
 
-        <div className="grid min-h-[240px] flex-1 grid-cols-1 gap-2.5 lg:min-h-0 lg:grid-cols-3 lg:gap-3">
-          <div className="min-h-[220px] min-w-0 overflow-hidden lg:col-span-2 lg:h-full lg:min-h-0">
-            <RecentActivities
-              activities={activities}
-              viewAllHref="/admin/reports"
-              fillHeight
-              className="h-full"
-            />
-          </div>
-          <div className="min-h-[220px] min-w-0 overflow-hidden lg:h-full lg:min-h-0">
-            <UpcomingExams
-              exams={exams}
-              examListHref="/admin/exams"
-              scheduleLabel="Manage Exams"
-              fillHeight
-              className="h-full"
-              onScheduleExam={() => {
-                window.location.href = "/admin/exams";
-              }}
-            />
-          </div>
+          <article className="dsh-card">
+            <div className="dsh-card-head">
+              <h2>Recent <i>activities</i></h2>
+              <Link href="/admin/reports">View all</Link>
+            </div>
+            {isLoading ? (
+              <DashSkeleton />
+            ) : activities.length === 0 ? (
+              <EmptyNote>No activity yet.</EmptyNote>
+            ) : (
+              <div className="dsh-scroll">
+                <ActivityTimeline
+                  items={activities.map((item) => ({
+                    id: item.id,
+                    title: item.title,
+                    description: item.description,
+                    time: item.time,
+                    tone: ACTIVITY_TONE[item.type],
+                  }))}
+                />
+              </div>
+            )}
+          </article>
+
+          <article className="dsh-card dsh-exams">
+            <div className="dsh-card-head">
+              <h2>Upcoming <i>exams</i></h2>
+            </div>
+            {isLoading ? (
+              <DashSkeleton />
+            ) : exams.length === 0 ? (
+              <EmptyNote>No upcoming exams.</EmptyNote>
+            ) : (
+              <div className="dsh-scroll">
+                {exams.map((exam) => (
+                  <ExamCard
+                    key={exam.id}
+                    title={exam.title}
+                    detail={exam.subtitle}
+                    open={exam.urgencyLabel.toLowerCase() === "open" || exam.urgency === "high"}
+                    status={exam.urgencyLabel}
+                  />
+                ))}
+              </div>
+            )}
+            <Link href="/admin/exams" className="dsh-btn lime">Manage exams</Link>
+          </article>
         </div>
-      </div>
+      </DashboardShell>
     </DashboardLayout>
   );
 }

@@ -1833,8 +1833,7 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
             enrolled: enrollments.length,
           };
         })
-        .sort((a, b) => b.percentage - a.percentage || b.enrolled - a.enrolled)
-        .slice(0, 5);
+        .sort((a, b) => b.percentage - a.percentage || b.enrolled - a.enrolled);
 
       const avgCompletion =
         courses.length === 0 ? 0 : Math.round(progressSum / courses.length);
@@ -1956,7 +1955,7 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
       );
 
       for (const log of sortedLogs) {
-        if (recentActivities.length >= 6) break;
+        if (recentActivities.length >= 24) break;
         try {
           const actor = userById.get(log.userId);
           const actorName = actor
@@ -2035,7 +2034,6 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
 
       const publishedExams = exams
         .filter((e) => e.acceptingResponses !== false)
-        .slice(0, 3)
         .map((exam) => {
           const course = courses.find((c) => c.id === exam.courseId);
           return {
