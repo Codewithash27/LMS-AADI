@@ -1,4 +1,5 @@
-import { BookOpen, ChevronLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
+import { BrandMark, BrandWordmark } from "@/components/brand/BrandMark";
 import { Link } from "wouter";
 import { CourseTabs } from "./CourseTabs";
 
@@ -48,10 +49,8 @@ export function CourseHero({
     <header className="scp-hero">
       <div className="scp-top">
         <div className="scp-brand">
-          <span className="scp-logo" aria-hidden>
-            <BookOpen strokeWidth={2.2} />
-          </span>
-          <span className="scp-brand-name">Edu Transform</span>
+          <BrandMark size="sm" />
+          <BrandWordmark className="scp-brand-name" />
         </div>
         <div className="scp-user">
           <span>

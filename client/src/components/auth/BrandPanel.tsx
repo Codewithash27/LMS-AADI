@@ -1,12 +1,13 @@
 import { BarChart3, BookOpen, Building2, FileText } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
+import { BrandMark, BrandWordmark } from "@/components/brand/BrandMark";
 
 const features = [
   {
     title: "Manage Courses",
     text: "Create and organize courses with lessons in various formats.",
     icon: BookOpen,
-    tone: "violet",
+    tone: "lime",
   },
   {
     title: "Create Exams",
@@ -40,6 +41,10 @@ export function BrandPanel() {
         animate={{ opacity: 1, y: 0 }}
         transition={fade}
       >
+        <div className="auth-brand-logo">
+          <BrandMark size="sm" />
+          <BrandWordmark />
+        </div>
         <p className="k">Learning management system</p>
         <h2>
           Learn. Test.

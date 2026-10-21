@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
+import { BrandWordmark } from "@/components/brand/BrandMark";
 import {
   BarChart3,
   BookOpen,
@@ -400,7 +401,7 @@ export default function Sidebar({
         </div>
         {!collapsed && (
           <div className="rail-brand-text">
-            <div className="rail-name">Edu Transform</div>
+            <BrandWordmark className="rail-name" />
             <div className="rail-sub">Aadi Technology</div>
           </div>
         )}

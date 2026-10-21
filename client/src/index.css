@@ -609,8 +609,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 16px;
-  background: var(--primary);
-  color: var(--bg);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .rail-logo svg {
@@ -623,7 +623,8 @@
   flex: 1;
 }
 
-.rail-name {
+.rail-name,
+.rail-name.brand-wordmark {
   font-family: Fraunces, Georgia, serif;
   font-size: 20px;
   font-weight: 600;
@@ -1771,11 +1772,12 @@
   align-items: center;
   justify-content: center;
   border-radius: 12px;
-  background: var(--violet);
+  background: var(--accent);
   color: var(--on-accent);
 }
 .scp-logo svg { width: 18px; height: 18px; }
 .scp-brand-name { font-family: Fraunces, Georgia, serif; font-size: 20px; font-weight: 500; }
+.scp-brand .brand-wordmark { font-size: 20px; }
 .scp-user { color: var(--text-muted); }
 .scp-avatar {
   display: flex;
@@ -2269,9 +2271,28 @@
 .auth-col { display: flex; width: 100%; flex-direction: column; gap: 26px; margin-block: auto; }
 .auth-col.login { max-width: 460px; }
 .auth-col.register { max-width: 560px; }
-.auth-logo { display: flex; align-items: center; gap: 12px; font-family: Fraunces, Georgia, serif; font-size: 22px; font-weight: 500; }
-.auth-logo span { display: flex; width: 44px; height: 44px; align-items: center; justify-content: center; border-radius: 14px; background: var(--violet); color: var(--text); }
-.auth-logo svg { width: 22px; height: 22px; }
+.brand-mark {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: var(--lime, var(--accent, #d4ff3f));
+  color: var(--on-lime, var(--on-accent, #0a0a0f));
+}
+.brand-mark svg { width: 22px; height: 22px; }
+.brand-mark-sm { width: 36px; height: 36px; border-radius: 12px; }
+.brand-mark-sm svg { width: 18px; height: 18px; }
+.brand-mark-lg { width: 48px; height: 48px; border-radius: 16px; }
+.brand-mark-lg svg { width: 24px; height: 24px; }
+.brand-mark-xl { width: 56px; height: 56px; border-radius: 18px; }
+.brand-mark-xl svg { width: 28px; height: 28px; }
+.brand-wordmark { font-family: Fraunces, Georgia, serif; font-size: 22px; font-weight: 500; letter-spacing: -0.02em; color: var(--text, #f3f2fa); }
+.brand-wordmark i { color: var(--lime, var(--accent, #d4ff3f)); font-style: italic; }
+.rail .brand-wordmark { font-size: 20px; font-weight: 600; color: var(--text); }
+.auth-logo { display: flex; align-items: center; gap: 12px; }
 .auth-col h1 { margin: 0; font-family: Fraunces, Georgia, serif; font-size: 56px; font-weight: 500; letter-spacing: -0.03em; line-height: 0.95; }
 .auth-col.register h1 { font-size: 52px; }
 .auth-col h1 i { color: var(--lime); font-style: italic; }
@@ -2280,8 +2301,8 @@
 .auth-tabs button { height: 42px; border: 0; border-radius: 99px; background: transparent; color: var(--muted); font-weight: 700; }
 .auth-tabs button[aria-selected="true"] { background: var(--lime); color: var(--on-lime); font-weight: 800; }
 .auth-form { display: flex; flex-direction: column; gap: 18px; }
-.auth-note { display: flex; align-items: flex-start; gap: 12px; border: 1px solid color-mix(in srgb, var(--violet) 25%, transparent); border-radius: 18px; background: color-mix(in srgb, var(--violet) 10%, transparent); padding: 14px 16px; color: var(--text); }
-.auth-note svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; color: var(--violet-soft); }
+.auth-note { display: flex; align-items: flex-start; gap: 12px; border: 1px solid color-mix(in srgb, var(--lime) 28%, transparent); border-radius: 18px; background: color-mix(in srgb, var(--lime) 8%, transparent); padding: 14px 16px; color: var(--text); }
+.auth-note svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; color: var(--lime); }
 .auth-note p { margin: 0; }
 .auth-field { display: flex; flex-direction: column; gap: 9px; }
 .auth-field label { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; }
@@ -2346,9 +2367,11 @@
 .auth-rules li { border-radius: 99px; background: var(--raised); color: var(--muted); padding: 4px 10px; font-size: 12px; font-weight: 700; }
 .auth-rules .ok { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
 .auth-brand { position: relative; display: flex; align-items: center; overflow: hidden; background: var(--panel); padding: 48px; }
-.auth-brand::before { content: ""; position: absolute; inset: 0; background: repeating-radial-gradient(circle at 100% 0%, rgba(124, 108, 255, 0.3) 0 2px, transparent 2px 24px); }
+.auth-brand::before { content: ""; position: absolute; inset: 0; background: repeating-radial-gradient(circle at 100% 0%, rgba(212, 255, 63, 0.22) 0 2px, transparent 2px 24px); }
 .auth-brand::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 42%, var(--panel)); }
 .auth-brand-copy { position: relative; z-index: 1; max-width: 640px; }
+.auth-brand-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.auth-brand-logo .brand-wordmark { font-size: 20px; }
 .auth-brand .k { margin: 0; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; }
 .auth-brand h2 { margin: 12px 0 0; font-family: Fraunces, Georgia, serif; font-size: 76px; font-weight: 500; letter-spacing: -0.03em; line-height: 0.92; }
 .auth-brand h2 i { color: var(--lime); font-style: italic; }
@@ -2357,6 +2380,7 @@
 .auth-features article { border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 24px; background: rgba(255, 255, 255, 0.04); padding: 18px; }
 .auth-features article > span { display: flex; width: 44px; height: 44px; align-items: center; justify-content: center; border-radius: 14px; }
 .auth-features svg { width: 20px; height: 20px; }
+.auth-features .lime { background: color-mix(in srgb, var(--lime) 18%, transparent); color: var(--lime); }
 .auth-features .violet { background: color-mix(in srgb, var(--violet) 20%, transparent); color: var(--violet-soft); }
 .auth-features .amber { background: color-mix(in srgb, var(--amber) 20%, transparent); color: var(--amber); }
 .auth-features .green { background: color-mix(in srgb, var(--green) 20%, transparent); color: var(--green); }

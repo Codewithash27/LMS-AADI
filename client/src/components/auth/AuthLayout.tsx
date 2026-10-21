@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { BookOpen } from "lucide-react";
+import { BrandMark, BrandWordmark } from "@/components/brand/BrandMark";
 import { BrandPanel } from "./BrandPanel";
 
 type AuthLayoutProps = {
@@ -14,10 +14,8 @@ export function AuthLayout({ mode, tabs, children }: AuthLayoutProps) {
       <main className="auth-main">
         <div className={`auth-col ${mode}`}>
           <div className="auth-logo">
-            <span>
-              <BookOpen strokeWidth={2} aria-hidden />
-            </span>
-            Edu Transform
+            <BrandMark />
+            <BrandWordmark />
           </div>
           <header>
             <h1>
