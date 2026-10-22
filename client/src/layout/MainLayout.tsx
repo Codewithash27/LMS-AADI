@@ -62,7 +62,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }, [logoutMutation]);
 
   const syncedDash = location === "/" || location.startsWith("/admin/dashboard");
-  const courseLibrary = location === "/admin/courses";
+  const courseLibrary =
+    location === "/admin/courses" || location === "/student/my-courses";
   const examBoard = location === "/admin/exams";
   const coursePlayer = /^\/student\/my-courses\/\d+/.test(location);
   const dashHome = syncedDash || location === "/student/dashboard";

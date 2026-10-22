@@ -5,12 +5,19 @@ import { useSidebar } from "@/hooks/use-sidebar";
 type PageHeaderProps = {
   search: string;
   onSearch: (value: string) => void;
-  onCreate: () => void;
+  variant?: "admin" | "student";
+  onCreate?: () => void;
 };
 
-export function PageHeader({ search, onSearch, onCreate }: PageHeaderProps) {
+export function PageHeader({
+  search,
+  onSearch,
+  variant = "admin",
+  onCreate,
+}: PageHeaderProps) {
   const isMobile = useIsMobile();
   const { setMobileOpen } = useSidebar();
+  const student = variant === "student";
 
   return (
     <div className="lib-head">
@@ -26,10 +33,18 @@ export function PageHeader({ search, onSearch, onCreate }: PageHeaderProps) {
               <Menu strokeWidth={2} />
             </button>
           )}
-          <span className="k">Academics / Courses</span>
+          <span className="k">{student ? "Learning / My courses" : "Academics / Courses"}</span>
         </div>
         <h1 className="lib-title">
-          Course <i>library</i>
+          {student ? (
+            <>
+              My <i>courses</i>
+            </>
+          ) : (
+            <>
+              Course <i>library</i>
+            </>
+          )}
         </h1>
       </div>
       <div className="lib-tools">
@@ -38,14 +53,16 @@ export function PageHeader({ search, onSearch, onCreate }: PageHeaderProps) {
           <input
             value={search}
             onChange={(event) => onSearch(event.target.value)}
-            placeholder="Search anything..."
-            aria-label="Search courses"
+            placeholder={student ? "Search your courses..." : "Search anything..."}
+            aria-label={student ? "Search your courses" : "Search courses"}
           />
         </label>
-        <button type="button" className="lib-new" onClick={onCreate}>
-          <Plus strokeWidth={2.4} aria-hidden />
-          New course
-        </button>
+        {!student && onCreate ? (
+          <button type="button" className="lib-new" onClick={onCreate}>
+            <Plus strokeWidth={2.4} aria-hidden />
+            New course
+          </button>
+        ) : null}
       </div>
     </div>
   );

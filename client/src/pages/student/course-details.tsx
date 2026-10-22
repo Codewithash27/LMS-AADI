@@ -306,35 +306,75 @@ export default function StudentCourseDetails() {
         />
 
         {activeTab === "overview" && (
-          <div className="scp-panel" role="tabpanel" id="scp-panel-overview" aria-labelledby="scp-tab-overview">
-            <section className="scp-block">
+          <div
+            className="scp-panel scp-overview"
+            role="tabpanel"
+            id="scp-panel-overview"
+            aria-labelledby="scp-tab-overview"
+          >
+            <section className="scp-block scp-about">
               <h2>About this course</h2>
-              <p>{(course as any).description}</p>
-              <h3>What you'll learn</h3>
-              <ul>
+              <p className="scp-about-text">{(course as any).description}</p>
+              <dl className="scp-about-stats">
+                <div>
+                  <dt>Modules</dt>
+                  <dd>{(modules as any[]).length}</dd>
+                </div>
+                <div>
+                  <dt>Duration</dt>
+                  <dd>{(course as any).duration ?? 12} wks</dd>
+                </div>
+                <div>
+                  <dt>Level</dt>
+                  <dd>{(course as any).difficulty || "All levels"}</dd>
+                </div>
+              </dl>
+              <h3>What you&apos;ll learn</h3>
+              <ul className="scp-learn-list">
                 <li>Core concepts and fundamentals</li>
                 <li>Practical application of skills</li>
                 <li>Advanced techniques and best practices</li>
               </ul>
-            </section>
-            <section className="scp-block">
-              <h2>Course structure</h2>
-              <p>This course contains {(modules as any[]).length} modules with various lessons</p>
-              {isLoadingModules ? (
-                <div className="scp-skeletons" aria-busy="true"><div /><div /><div /></div>
-              ) : (modules as any[]).length === 0 ? (
-                <p>No modules available yet.</p>
-              ) : (
-                (modules as any[]).map((module) => (
-                  <div key={module.id} className="scp-structure">
-                    <h3>{module.title}</h3>
-                    <p>{module.description}</p>
-                  </div>
-                ))
-              )}
               <button type="button" className="scp-start" onClick={() => setActiveTab("content")}>
-                Start Learning
+                Start learning
               </button>
+            </section>
+            <section className="scp-block scp-structure-wrap">
+              <div className="scp-structure-head">
+                <h2>
+                  Course <i>structure</i>
+                </h2>
+                <p>Tap a module to jump into Course content.</p>
+              </div>
+              {isLoadingModules ? (
+                <div className="scp-skeletons scp-structure-grid" aria-busy="true">
+                  <div />
+                  <div />
+                  <div />
+                  <div />
+                </div>
+              ) : (modules as any[]).length === 0 ? (
+                <p className="scp-note">No modules available yet.</p>
+              ) : (
+                <div className="scp-structure-grid slim-scroll">
+                  {(modules as any[]).map((module, index) => (
+                    <button
+                      key={module.id}
+                      type="button"
+                      className="scp-structure-item"
+                      title={module.title}
+                      onClick={() => {
+                        setActiveModuleId(module.id);
+                        setActiveTab("content");
+                        setScrollSignal((value) => value + 1);
+                      }}
+                    >
+                      <span className="scp-structure-num">{index + 1}</span>
+                      <span className="scp-structure-title">{module.title}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </section>
           </div>
         )}
