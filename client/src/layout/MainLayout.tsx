@@ -64,7 +64,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const syncedDash = location === "/" || location.startsWith("/admin/dashboard");
   const courseLibrary =
     location === "/admin/courses" || location === "/student/my-courses";
-  const examBoard = location === "/admin/exams";
+  const examBoard = location === "/admin/exams" || location === "/admin/grading";
   const coursePlayer = /^\/student\/my-courses\/\d+/.test(location);
   const dashHome = syncedDash || location === "/student/dashboard";
   const flushDark = courseLibrary || coursePlayer || dashHome || examBoard;

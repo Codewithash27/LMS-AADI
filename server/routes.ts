@@ -1654,10 +1654,12 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
           req.body.score = graded.score;
           req.body.maxScore = graded.maxScore;
           req.body.feedback = graded.feedback;
+          req.body.reviewedAt = new Date();
           questionResults = graded.questionResults;
         } else {
           req.body.score = null;
           req.body.maxScore = null;
+          req.body.reviewedAt = null;
         }
         
         // Create activity log
@@ -3145,9 +3147,47 @@ app.delete("/api/users/:id", isAdmin, async (req, res) => {
   app.put("/api/admin/exam-attempts/:id/grade", isAdmin, async (req, res) => {
     try {
       const attemptId = parseInt(req.params.id);
-      const { feedback } = req.body;
+      if (!Number.isFinite(attemptId)) {
+        return res.status(400).json({ message: "Invalid attempt id" });
+      }
+
+      const feedback =
+        typeof req.body?.feedback === "string" ? req.body.feedback.trim() : "";
+
+      const existing = await storage.getExamAttempt(attemptId);
+      if (!existing) {
+        return res.status(404).json({ message: "Exam attempt not found" });
+      }
+      if (!existing.completedAt) {
+        return res.status(400).json({ message: "Cannot grade an exam that is still in progress" });
+      }
+
+      const exam = await storage.getExam(existing.examId);
+      if (!exam || exam.tenantId !== req.user!.tenantId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const examType = normalizeExamType(exam.examType);
+      if (examType === "mcq") {
+        return res.status(400).json({
+          message: "MCQ exams are auto-graded. Open the attempt to view the score.",
+        });
+      }
+
+      if (!feedback) {
+        return res.status(400).json({ message: "Instructor feedback is required for theory exams" });
+      }
 
       const attempt = await storage.gradeExamAttempt(attemptId, feedback, req.user!.tenantId);
+
+      await storage.createActivityLog({
+        userId: existing.userId,
+        activityType: "exam_graded",
+        resourceId: existing.examId,
+        resourceType: "exam",
+        tenantId: req.user!.tenantId,
+      });
+
       res.json(attempt);
     } catch (error) {
       console.error("Failed to grade exam attempt:", error);
