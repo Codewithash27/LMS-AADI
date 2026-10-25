@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import CourseEditor from "@/components/courses/course-editor";
 import { PageHeader } from "@/components/courses/library/page-header";
@@ -10,7 +10,11 @@ import {
   Plus,
   Trash2,
   Users,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+import { useClientPagination } from "@/hooks/use-client-pagination";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +28,17 @@ import {
 } from "@/components/ui/dialog";
 import { getCourseThumbnailSrc } from "@/lib/course-thumbnail";
 import { getProfilePhotoSrc } from "@/lib/profile-photo";
+
+function pageWindow(page: number, pageCount: number) {
+  if (pageCount <= 5) return Array.from({ length: pageCount }, (_, index) => index + 1);
+  const start = Math.max(1, Math.min(page - 2, pageCount - 4));
+  return Array.from({ length: 5 }, (_, index) => start + index);
+}
+
+const COURSES_PAGE_SIZE = 6;
+
+const pagerButton =
+  "grid h-10 w-10 place-items-center rounded-full border border-white/15 text-sm font-extrabold text-[#A3A1B8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D4FF3F] disabled:opacity-40";
 
 export default function AdminCourses() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -285,14 +300,27 @@ export default function AdminCourses() {
     }
   };
 
-  const filteredCourses = courses.filter((course: any) => {
-    const matchesSearch =
-      (course.title?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-      (course.description?.toLowerCase() || "").includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || course.status === statusFilter;
-    const matchesLevel = levelFilter === "all" || course.difficulty === levelFilter;
-    return matchesSearch && matchesStatus && matchesLevel;
-  });
+  const filteredCourses = useMemo(
+    () =>
+      courses.filter((course: any) => {
+        const matchesSearch =
+          (course.title?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+          (course.description?.toLowerCase() || "").includes(searchTerm.toLowerCase());
+        const matchesStatus = statusFilter === "all" || course.status === statusFilter;
+        const matchesLevel = levelFilter === "all" || course.difficulty === levelFilter;
+        return matchesSearch && matchesStatus && matchesLevel;
+      }),
+    [courses, searchTerm, statusFilter, levelFilter]
+  );
+
+  const { page, pageCount, pageItems, setPage } = useClientPagination(
+    filteredCourses,
+    COURSES_PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, statusFilter, levelFilter, setPage]);
 
   const libraryFilter: LibraryFilter =
     statusFilter === "active" && levelFilter === "all"
@@ -377,32 +405,77 @@ export default function AdminCourses() {
           <h2>No courses match</h2>
         </div>
       ) : (
-        <div className="course-grid">
-          {filteredCourses.map((course: any) => {
-            const tone = Math.max(0, courses.findIndex((item) => item.id === course.id));
-            const roster = courseRosters[course.id];
-            return (
-              <CourseCard
-                key={course.id}
-                href={`/admin/courses/${course.id}/progress`}
-                title={course.title}
-                tone={tone}
-                thumbnail={getCourseThumbnailSrc(course.thumbnail)}
-                level={course.difficulty ? String(course.difficulty).toUpperCase() : null}
-                meta={courseMeta(course)}
-                people={peopleFor(course.id)}
-                enrolled={getEnrollmentCount(course)}
-                progress={roster && roster.count > 0 ? roster.averageProgress : null}
-                onEdit={() => handleEditCourse(course)}
-                onAssign={() => openAssignDialog(course)}
-                onView={() => {
-                  window.location.href = `/admin/courses/${course.id}/progress`;
-                }}
-                onDelete={() => handleDeleteCourse(course)}
-              />
-            );
-          })}
-        </div>
+        <>
+          <div className="course-grid">
+            {pageItems.map((course: any) => {
+              const tone = Math.max(0, courses.findIndex((item) => item.id === course.id));
+              const roster = courseRosters[course.id];
+              return (
+                <CourseCard
+                  key={course.id}
+                  href={`/admin/courses/${course.id}/progress`}
+                  title={course.title}
+                  tone={tone}
+                  thumbnail={getCourseThumbnailSrc(course.thumbnail)}
+                  level={course.difficulty ? String(course.difficulty).toUpperCase() : null}
+                  meta={courseMeta(course)}
+                  people={peopleFor(course.id)}
+                  enrolled={getEnrollmentCount(course)}
+                  progress={roster && roster.count > 0 ? roster.averageProgress : null}
+                  onEdit={() => handleEditCourse(course)}
+                  onAssign={() => openAssignDialog(course)}
+                  onView={() => {
+                    window.location.href = `/admin/courses/${course.id}/progress`;
+                  }}
+                  onDelete={() => handleDeleteCourse(course)}
+                />
+              );
+            })}
+          </div>
+          {pageCount > 1 ? (
+            <nav className="mt-8 flex items-center justify-center gap-2" aria-label="Course pages">
+              <ActionTooltip label="Previous page" side="top" className="course-tip">
+                <button
+                  type="button"
+                  aria-label="Previous page"
+                  onClick={() => setPage(page - 1)}
+                  disabled={page <= 1}
+                  className={pagerButton}
+                >
+                  <ChevronLeft className="h-4 w-4" aria-hidden />
+                </button>
+              </ActionTooltip>
+              {pageWindow(page, pageCount).map((number) => (
+                <ActionTooltip key={number} label={`Page ${number}`} side="top" className="course-tip">
+                  <button
+                    type="button"
+                    aria-label={`Page ${number}`}
+                    aria-current={number === page ? "page" : undefined}
+                    onClick={() => setPage(number)}
+                    className={
+                      number === page
+                        ? "grid h-10 w-10 place-items-center rounded-full bg-[#D4FF3F] text-sm font-extrabold text-[#0A0A0F] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D4FF3F]"
+                        : pagerButton
+                    }
+                  >
+                    {number}
+                  </button>
+                </ActionTooltip>
+              ))}
+              <ActionTooltip label="Next page" side="top" className="course-tip">
+                <button
+                  type="button"
+                  aria-label="Next page"
+                  onClick={() => setPage(page + 1)}
+                  disabled={page >= pageCount}
+                  className={pagerButton}
+                >
+                  <ChevronRight className="h-4 w-4" aria-hidden />
+                </button>
+              </ActionTooltip>
+            </nav>
+          ) : null}
+        </>
       )}
 
       <CourseEditor

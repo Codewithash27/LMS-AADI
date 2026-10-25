@@ -1,53 +1,34 @@
-import { useState, useEffect, useRef } from "react";
-import { Link } from "wouter";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import Header from "@/components/layout/header";
-import ListToolbar from "@/components/layout/list-toolbar";
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ActionTooltip } from "@/components/ui/action-tooltip";
+import { AssignCoursesDialog } from "@/components/students/assign-courses-dialog";
+import { StudentCard, StudentCardSkeleton } from "@/components/students/student-card";
+import { Search } from "lucide-react";
+
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Mail,
   Eye,
   EyeOff,
-  GraduationCap,
-  BookOpen,
   Plus,
   Trash2,
-  Download,
   Upload,
   UserPlus,
-  CheckCircle2,
   AlertTriangle,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  TableCell,
-  TableRow,
-} from "@/components/ui/table";
-import DataTable from "@/components/primitives/DataTable";
-import { useClientPagination } from "@/hooks/use-client-pagination";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getProfilePhotoSrc } from "@/lib/profile-photo";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
+import { useClientPagination } from "@/hooks/use-client-pagination";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import {
   Select,
   SelectContent,
@@ -76,6 +57,18 @@ import {
   type CreateStudentFormValues,
 } from "@/lib/form-schemas";
 import { cn } from "@/lib/utils";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
+
+function pageWindow(page: number, pageCount: number) {
+  if (pageCount <= 5) return Array.from({ length: pageCount }, (_, index) => index + 1);
+  const start = Math.max(1, Math.min(page - 2, pageCount - 4));
+  return Array.from({ length: 5 }, (_, index) => start + index);
+}
+
+const STUDENTS_PAGE_SIZE = 8;
+
+const pagerButton =
+  "grid h-10 w-10 place-items-center rounded-full border border-white/15 text-sm font-extrabold text-[#A3A1B8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D4FF3F] disabled:opacity-40";
 
 const studentFormDefaults: CreateStudentFormValues = {
   firstName: "",
@@ -93,7 +86,7 @@ const studentFormDefaults: CreateStudentFormValues = {
 
 export default function AdminStudents() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [selectedCourseIds, setSelectedCourseIds] = useState<number[]>([]);
   const [initialEnrolledIds, setInitialEnrolledIds] = useState<number[]>([]);
   const [batchLockedCourseIds, setBatchLockedCourseIds] = useState<number[]>([]);
@@ -101,7 +94,6 @@ export default function AdminStudents() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
   const assignSelectionReady = useRef(false);
   const { toast } = useToast();
 
@@ -120,29 +112,71 @@ export default function AdminStudents() {
     queryKey: ["/api/courses"],
   });
 
-  const { data: studentEnrollments = [], isLoading: isLoadingEnrollments } = useQuery<any[]>({
-    queryKey: ["/api/enrollments/user", selectedStudent?.id],
+  const courseIdsKey = courses.map((c) => c.id).join(",");
+
+  const { data: enrollmentStatsByUser = {}, isSuccess: enrollmentStatsReady } = useQuery<
+    Record<number, { courseCount: number; avgProgress: number }>
+  >({
+    queryKey: ["/api/enrollments/student-stats", courseIdsKey],
+    enabled: courses.length > 0,
     queryFn: async () => {
-      if (!selectedStudent?.id) return [];
-      const res = await apiRequest("GET", `/api/enrollments/user/${selectedStudent.id}`);
+      const acc: Record<number, { count: number; progresses: number[] }> = {};
+      await Promise.all(
+        courses.map(async (course) => {
+          try {
+            const res = await apiRequest("GET", `/api/enrollments/course/${course.id}`);
+            const list = await res.json();
+            if (!Array.isArray(list)) return;
+            for (const row of list) {
+              const userId = Number(row.userId);
+              if (!Number.isFinite(userId)) continue;
+              if (!acc[userId]) acc[userId] = { count: 0, progresses: [] };
+              acc[userId].count += 1;
+              const p = Number(row.progress);
+              if (Number.isFinite(p)) acc[userId].progresses.push(p);
+            }
+          } catch {
+            /* ignore per-course */
+          }
+        })
+      );
+      return Object.fromEntries(
+        Object.entries(acc).map(([id, v]) => [
+          Number(id),
+          {
+            courseCount: v.count,
+            avgProgress: v.progresses.length
+              ? Math.round(v.progresses.reduce((s, n) => s + n, 0) / v.progresses.length)
+              : 0,
+          },
+        ])
+      );
+    },
+  });
+
+  const { data: studentEnrollments = [], isLoading: isLoadingEnrollments } = useQuery<any[]>({
+    queryKey: ["/api/enrollments/user", selectedStudentId],
+    queryFn: async () => {
+      if (!selectedStudentId) return [];
+      const res = await apiRequest("GET", `/api/enrollments/user/${selectedStudentId}`);
       return res.json();
     },
-    enabled: isAssignDialogOpen && !!selectedStudent?.id,
+    enabled: !!selectedStudentId && isAssignDialogOpen,
   });
 
   const { data: batchLockedData, isLoading: isLoadingBatchLocks } = useQuery<{
     courseIds: number[];
   }>({
-    queryKey: ["/api/enrollments/user", selectedStudent?.id, "batch-locked-courses"],
+    queryKey: ["/api/enrollments/user", selectedStudentId, "batch-locked-courses"],
     queryFn: async () => {
-      if (!selectedStudent?.id) return { courseIds: [] };
+      if (!selectedStudentId) return { courseIds: [] };
       const res = await apiRequest(
         "GET",
-        `/api/enrollments/user/${selectedStudent.id}/batch-locked-courses`
+        `/api/enrollments/user/${selectedStudentId}/batch-locked-courses`
       );
       return res.json();
     },
-    enabled: isAssignDialogOpen && !!selectedStudent?.id,
+    enabled: !!selectedStudentId && isAssignDialogOpen,
   });
 
   useEffect(() => {
@@ -210,6 +244,7 @@ export default function AdminStudents() {
       queryClient.invalidateQueries({ queryKey: ["/api/enrollments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/enrollments/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/enrollments/counts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/enrollments/student-stats"] });
     },
     onError: (error: any) => {
       toast({
@@ -251,7 +286,6 @@ export default function AdminStudents() {
         description: `${selectedStudent?.firstName} ${selectedStudent?.lastName} has been deleted successfully`,
       });
       setIsDeleteDialogOpen(false);
-      setSelectedStudent(null);
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
     },
     onError: (error: any) => {
@@ -280,7 +314,7 @@ export default function AdminStudents() {
 
   // Handle assigning courses to student
   const handleAssignCourse = () => {
-    if (!selectedStudent?.id) return;
+    if (!selectedStudentId) return;
     const selected = selectedCourseIds.map(Number);
     const initial = initialEnrolledIds.map(Number);
     const locked = new Set(batchLockedCourseIds.map(Number));
@@ -297,22 +331,20 @@ export default function AdminStudents() {
       return;
     }
     assignCourseMutation.mutate({
-      userId: selectedStudent.id,
+      userId: selectedStudentId,
       toAdd,
       toRemove,
     });
   };
 
-  // Handle deleting student
   const handleDeleteStudent = () => {
-    if (!selectedStudent) return;
-    
-    deleteStudentMutation.mutate(selectedStudent.id);
+    if (!selectedStudentId) return;
+    deleteStudentMutation.mutate(selectedStudentId);
   };
   
   // Open assign course dialog
-  const openAssignDialog = (student: any) => {
-    setSelectedStudent(student);
+  const openAssignDialog = (student: { id: number }) => {
+    setSelectedStudentId(student.id);
     setSelectedCourseIds([]);
     setInitialEnrolledIds([]);
     setBatchLockedCourseIds([]);
@@ -330,9 +362,8 @@ export default function AdminStudents() {
     createStudentMutation.mutate(values);
   };
 
-  // Open delete confirmation dialog
-  const openDeleteDialog = (student: any) => {
-    setSelectedStudent(student);
+  const openDeleteDialog = (student: { id: number }) => {
+    setSelectedStudentId(student.id);
     setIsDeleteDialogOpen(true);
   };
   
@@ -341,218 +372,180 @@ export default function AdminStudents() {
     .filter((user) => user.role === "student")
     .sort((a, b) => b.id - a.id);
   
-  // Filter students based on search term and status
   const filteredStudents = students.filter((student: any) => {
-    const matchesSearch = 
-      student.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.username.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === "all" || student.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
+    const q = searchTerm.toLowerCase();
+    return (
+      student.firstName.toLowerCase().includes(q) ||
+      student.lastName.toLowerCase().includes(q) ||
+      student.email.toLowerCase().includes(q) ||
+      student.username.toLowerCase().includes(q)
+    );
   });
+
+  const selectedStudent = useMemo(
+    () => students.find((s: any) => s.id === selectedStudentId) ?? null,
+    [students, selectedStudentId]
+  );
 
   const {
     page,
-    pageSize,
     total,
+    pageCount,
     pageItems,
     setPage,
-    setPageSize,
-  } = useClientPagination(filteredStudents, 10);
+  } = useClientPagination(filteredStudents, STUDENTS_PAGE_SIZE);
 
-  // Helper function to get initials from name
-  const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
-  };
-  
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, setPage]);
+
+  const studentLabel = selectedStudent
+    ? `${selectedStudent.firstName} ${selectedStudent.lastName}`
+    : "this student";
+
   return (
     <DashboardLayout>
-      <Header
-        title="Students"
-        actions={
-          <ListToolbar
-            searchValue={searchTerm}
-            onSearchChange={setSearchTerm}
-            searchPlaceholder="Search students..."
-            filters={
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-10 w-[140px] rounded-xl border-border bg-white shadow-sm">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                </SelectContent>
-              </Select>
-            }
-            action={
-              <ActionTooltip label="Add student">
-                <span className="inline-flex">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        className="h-11 w-11 shrink-0 rounded-xl p-0"
-                        aria-label="Add student"
-                      >
-                        <Plus className="h-5 w-5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="rounded-xl">
-                      <DropdownMenuItem className="gap-2" onClick={openAddDialog}>
-                        <UserPlus className="h-4 w-4" />
-                        Add Single Student
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2" disabled>
-                        <Upload className="h-4 w-4" />
-                        Bulk Import
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2" disabled>
-                        <Download className="h-4 w-4" />
-                        Export Template
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </span>
-              </ActionTooltip>
-            }
-          />
-        }
-      />
+      <div className="min-w-0 bg-[#07070C] font-[Manrope,system-ui,sans-serif] text-[#F3F2FA]">
+        <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div className="min-w-0">
+            <p className="mb-3.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#A3A1B8]">
+              People / Students
+            </p>
+            <h1 className="font-[Fraunces,Georgia,serif] text-[72px] font-medium leading-none tracking-[-0.03em] text-[#F3F2FA] max-[980px]:text-[48px]">
+              Meet your <i className="italic text-[#D4FF3F]">students</i>
+            </h1>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled
+              className="inline-flex h-12 min-h-[44px] items-center gap-2 rounded-full border border-white/[0.09] bg-transparent px-5 text-sm font-extrabold text-[#A3A1B8] opacity-60"
+            >
+              <Upload className="h-4 w-4" aria-hidden />
+              Bulk import
+            </button>
+            <button
+              type="button"
+              onClick={openAddDialog}
+              className="inline-flex h-12 min-h-[44px] items-center gap-2 rounded-full bg-[#D4FF3F] px-5 text-sm font-extrabold text-[#0A0A0F] hover:bg-[#E4FF7A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D4FF3F]"
+            >
+              <Plus className="h-4 w-4" strokeWidth={2.4} aria-hidden />
+              Add student
+            </button>
+          </div>
+        </header>
 
-      {/* Students Directory — Campus Axis list style */}
-      {isLoading ? (
-        <div className="flex min-h-[240px] items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <div className="mb-6 flex min-w-0 flex-wrap items-center gap-2.5">
+          <label className="flex h-12 min-h-[44px] min-w-[200px] flex-1 items-center gap-2 rounded-full border border-white/[0.06] bg-[#0F0F18] px-4 focus-within:border-[#D4FF3F]/40">
+            <Search className="h-4 w-4 shrink-0 text-[#8E8CA6]" aria-hidden />
+            <input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search name, username, email…"
+              aria-label="Search students"
+              className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-[#F3F2FA] outline-none placeholder:text-[#8E8CA6]"
+            />
+          </label>
+
+          <span className="inline-flex h-12 min-h-[44px] shrink-0 items-center rounded-full bg-[#0B0B12] px-4 text-xs font-extrabold text-[#B4B2C8]">
+            {students.length} student{students.length === 1 ? "" : "s"}
+          </span>
+
+          <button
+            type="button"
+            disabled
+            aria-disabled
+            className="inline-flex h-12 min-h-[44px] items-center rounded-full border border-white/[0.09] bg-[#0F0F18] px-4 text-sm font-extrabold text-[#B4B2C8] opacity-80"
+          >
+            Newest first
+          </button>
         </div>
-      ) : (
-        <DataTable
-          title="Student Directory"
-          columns={[
-            { key: "student", label: "Student" },
-            { key: "username", label: "Username" },
-            { key: "email", label: "Email" },
-            { key: "status", label: "Status" },
-            { key: "actions", label: "Actions", align: "right" },
-          ]}
-          isEmpty={filteredStudents.length === 0}
-          empty={
-            <div className="text-center">
-              <GraduationCap className="mx-auto mb-3 h-12 w-12 text-muted-foreground/40" />
-              <h3 className="mb-1 text-lg font-semibold">No students found</h3>
-              <p className="text-[15px] text-muted-foreground">
-                {searchTerm
-                  ? "No students match your search."
-                  : "Add your first student to get started."}
-              </p>
+
+        {isLoading ? (
+          <div className="grid grid-cols-2 gap-[18px] min-[980px]:grid-cols-3 min-[1280px]:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <StudentCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : filteredStudents.length === 0 ? (
+          <div className="rounded-[26px] border border-white/[0.07] bg-[#0F0F18] px-6 py-16 text-center">
+            <p className="font-[Fraunces,Georgia,serif] text-3xl text-[#F3F2FA]">No students found</p>
+            <p className="mt-2 text-sm font-semibold text-[#A3A1B8]">
+              Try another search or filter, or add a new student.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-[18px] min-[980px]:grid-cols-3 min-[1280px]:grid-cols-4">
+              {pageItems.map((student: any, index: number) => {
+                const stats = enrollmentStatsByUser[student.id];
+                return (
+                  <StudentCard
+                    key={student.id}
+                    student={student}
+                    cardIndex={index}
+                    selected={selectedStudentId === student.id}
+                    onSelect={() => setSelectedStudentId(student.id)}
+                    onAssign={() => openAssignDialog(student)}
+                    onDelete={() => openDeleteDialog(student)}
+                    profileHref={`/admin/students/${student.id}`}
+                    courseCount={stats?.courseCount ?? 0}
+                    avgProgress={stats?.avgProgress ?? 0}
+                    showEnrollmentFooter={enrollmentStatsReady && courses.length > 0}
+                  />
+                );
+              })}
             </div>
-          }
-          page={page}
-          pageSize={pageSize}
-          total={total}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-        >
-          {pageItems.map((student: any) => {
-            const isActive = student.status === "active" || !student.status;
-            return (
-              <TableRow key={student.id} className="hover:bg-muted/70">
-                <TableCell className="py-3.5 pl-5">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
-                      {student.profilePhoto ? (
-                        <AvatarImage
-                          src={getProfilePhotoSrc(student.profilePhoto) || undefined}
-                          alt={`${student.firstName} ${student.lastName}`}
-                        />
-                      ) : null}
-                      <AvatarFallback className="bg-accent-brand text-sm font-bold text-white">
-                        {getInitials(student.firstName, student.lastName)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <p className="truncate text-[15px] font-semibold text-[#2D3748]">
-                        {student.firstName} {student.lastName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">ID: {student.id}</p>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="text-[15px] text-[#2D3748]/90">
-                  {student.username}
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2 text-[15px] text-[#2D3748]/90">
-                    <Mail className="h-3.5 w-3.5 shrink-0 text-[#A0AEC0]" />
-                    <span className="truncate">{student.email}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    className={cn(
-                      "rounded-full border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide",
-                      isActive
-                        ? "border-green-200 bg-green-100 text-green-800"
-                        : student.status === "inactive"
-                          ? "border-red-200 bg-red-100 text-red-800"
-                          : "border-amber-200 bg-amber-100 text-amber-800"
-                    )}
+
+            {pageCount > 1 ? (
+              <nav className="mt-8 flex items-center justify-center gap-2" aria-label="Student pages">
+                <ActionTooltip label="Previous page" side="top" className="course-tip">
+                  <button
+                    type="button"
+                    aria-label="Previous page"
+                    onClick={() => setPage(page - 1)}
+                    disabled={page <= 1}
+                    className={pagerButton}
                   >
-                    {isActive ? "Active" : student.status === "inactive" ? "Inactive" : "Pending"}
-                  </Badge>
-                </TableCell>
-                <TableCell className="pr-5 text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <Link href={`/admin/students/${student.id}`}>
-                      <ActionTooltip label="View details">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="h-9 w-9 p-0 text-primary hover:bg-primary/10"
-                          aria-label="View details"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </ActionTooltip>
-                    </Link>
-                    <ActionTooltip label="Assign course">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="h-9 w-9 p-0 text-primary hover:bg-primary/10"
-                        aria-label="Assign course"
-                        onClick={() => openAssignDialog(student)}
-                      >
-                        <BookOpen className="h-4 w-4" />
-                      </Button>
-                    </ActionTooltip>
-                    <ActionTooltip label="Delete student">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="h-9 w-9 p-0 text-[#d32f2f] hover:bg-[#d32f2f]/10"
-                        aria-label="Delete student"
-                        onClick={() => openDeleteDialog(student)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </ActionTooltip>
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </DataTable>
-      )}
-      
+                    <ChevronLeft className="h-4 w-4" aria-hidden />
+                  </button>
+                </ActionTooltip>
+                {pageWindow(page, pageCount).map((number) => (
+                  <ActionTooltip key={number} label={`Page ${number}`} side="top" className="course-tip">
+                    <button
+                      type="button"
+                      aria-label={`Page ${number}`}
+                      aria-current={number === page ? "page" : undefined}
+                      onClick={() => setPage(number)}
+                      className={
+                        number === page
+                          ? "grid h-10 w-10 place-items-center rounded-full bg-[#D4FF3F] text-sm font-extrabold text-[#0A0A0F] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D4FF3F]"
+                          : pagerButton
+                      }
+                    >
+                      {number}
+                    </button>
+                  </ActionTooltip>
+                ))}
+                <ActionTooltip label="Next page" side="top" className="course-tip">
+                  <button
+                    type="button"
+                    aria-label="Next page"
+                    onClick={() => setPage(page + 1)}
+                    disabled={page >= pageCount}
+                    className={pagerButton}
+                  >
+                    <ChevronRight className="h-4 w-4" aria-hidden />
+                  </button>
+                </ActionTooltip>
+              </nav>
+            ) : null}
+          </>
+        )}
+
+        {/* TODO: <StudentProfileDrawer open={!!selectedStudentId} student={selectedStudent} /> */}
+      </div>
+
       {/* Add Student Dialog */}
       <CreateFormDialog
         open={isAddDialogOpen}
@@ -855,179 +848,70 @@ export default function AdminStudents() {
         </Form>
       </CreateFormDialog>
 
-      <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-brand">
-              <BookOpen className="h-6 w-6 text-white" />
-            </div>
-            <DialogTitle className="text-center text-xl font-bold">
-              Assign Course
-            </DialogTitle>
-            <DialogDescription className="text-center">
-              {selectedStudent
-                ? `Select courses for ${selectedStudent.firstName} ${selectedStudent.lastName}. Batch courses stay locked.`
-                : "Select courses to enroll"}
-            </DialogDescription>
-          </DialogHeader>
+      <AssignCoursesDialog
+        open={isAssignDialogOpen}
+        onOpenChange={setIsAssignDialogOpen}
+        studentLabel={studentLabel}
+        courses={courses}
+        selectedIds={selectedCourseIds}
+        initialIds={initialEnrolledIds}
+        lockedIds={batchLockedCourseIds}
+        isLoading={isLoadingEnrollments || isLoadingBatchLocks}
+        isSaving={assignCourseMutation.isPending}
+        onToggle={toggleCourse}
+        onSave={handleAssignCourse}
+      />
 
-          <div className="space-y-3 py-1">
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>
-                {selectedCourseIds.length} of {courses.length} selected
-              </span>
-              <span>
-                {batchLockedCourseIds.length} from batch
-                {batchLockedCourseIds.length === 1 ? "" : "es"}
-              </span>
-            </div>
-
-            <div className="max-h-[320px] overflow-y-auto rounded-xl border border-border bg-white">
-              {isLoadingEnrollments || isLoadingBatchLocks ? (
-                <div className="flex items-center justify-center py-10">
-                  <div className="h-7 w-7 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                </div>
-              ) : courses.length === 0 ? (
-                <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-                  No courses available
-                </p>
-              ) : (
-                <ul className="divide-y divide-border/80">
-                  {courses.map((course) => {
-                    const checked = selectedCourseIds.includes(course.id);
-                    const wasEnrolled = initialEnrolledIds.includes(course.id);
-                    const lockedByBatch = batchLockedCourseIds.includes(course.id);
-                    return (
-                      <li key={course.id}>
-                        <label
-                          className={cn(
-                            "flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/70",
-                            checked && "bg-primary/5",
-                            lockedByBatch && "cursor-not-allowed bg-muted/40"
-                          )}
-                        >
-                          <Checkbox
-                            checked={checked || lockedByBatch}
-                            disabled={lockedByBatch}
-                            onCheckedChange={(value) =>
-                              toggleCourse(course.id, value === true)
-                            }
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-[15px] font-medium text-[#2D3748]">
-                              {course.title}
-                            </p>
-                            {course.level ? (
-                              <p className="truncate text-xs text-muted-foreground capitalize">
-                                {course.level}
-                              </p>
-                            ) : null}
-                          </div>
-                          {lockedByBatch ? (
-                            <Badge className="shrink-0 rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
-                              Via batch
-                            </Badge>
-                          ) : wasEnrolled ? (
-                            <Badge className="shrink-0 rounded-full border border-green-200 bg-green-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-800">
-                              Enrolled
-                            </Badge>
-                          ) : null}
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          </div>
-
-          <DialogFooter className="flex flex-col gap-3 sm:flex-row">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsAssignDialogOpen(false)}
-              disabled={assignCourseMutation.isPending}
-              className="flex-1 rounded-xl"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleAssignCourse}
-              disabled={assignCourseMutation.isPending || isLoadingEnrollments}
-              className="flex-1 gap-2 rounded-xl"
-            >
-              {assignCourseMutation.isPending ? (
-                "Saving..."
-              ) : (
-                <>
-                  <CheckCircle2 className="h-4 w-4" />
-                  Save Enrollments
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="backdrop-blur-sm bg-white/95 border border-white/20 shadow-2xl rounded-3xl max-w-md">
-          <DialogHeader>
-            <div className="p-3 bg-red-100 rounded-2xl w-12 h-12 flex items-center justify-center mx-auto mb-4">
-              <Trash2 className="h-6 w-6 text-red-600" />
+        <DialogContent className="max-w-md gap-0 overflow-hidden rounded-[28px] border border-white/[0.09] bg-[#0C0C14] p-0 font-[Manrope,system-ui,sans-serif] text-[#F3F2FA] shadow-[0_28px_80px_rgba(0,0,0,0.55)] [&>button.absolute]:hidden">
+          <div className="px-6 pb-2 pt-6">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FF8FA6]/15 text-[#FF8FA6]">
+              <Trash2 className="h-6 w-6" aria-hidden />
             </div>
-            <DialogTitle className="text-xl font-bold text-center text-gray-900">
-              Delete Student
-            </DialogTitle>
-            <DialogDescription className="text-center text-gray-600">
-              {selectedStudent && 
-                `Are you sure you want to delete ${selectedStudent.firstName} ${selectedStudent.lastName}? This action cannot be undone.`
-              }
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-            <div className="flex items-start space-x-3">
-              <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
-              <div className="text-sm text-amber-800">
-                <p className="font-medium">Warning: This will permanently delete:</p>
-                <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li>Student profile and data</li>
-                  <li>All course enrollments</li>
-                  <li>Progress and exam results</li>
-                </ul>
-              </div>
+            <DialogHeader className="space-y-2 text-center">
+              <DialogTitle className="font-[Fraunces,Georgia,serif] text-[28px] font-medium tracking-[-0.03em]">
+                Delete <i className="text-[#D4FF3F] not-italic">student</i>
+              </DialogTitle>
+              <DialogDescription className="text-sm text-[#A3A1B8]">
+                {selectedStudent
+                  ? `Remove ${selectedStudent.firstName} ${selectedStudent.lastName}? This cannot be undone.`
+                  : "Remove this student? This cannot be undone."}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="mx-6 mb-4 rounded-[20px] border border-[#F7C766]/25 bg-[#F7C766]/10 p-4">
+            <div className="flex gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#F7C766]" aria-hidden />
+              <ul className="list-inside list-disc space-y-1 text-sm font-semibold text-[#F7C766]">
+                <li>Student profile and data</li>
+                <li>All course enrollments</li>
+                <li>Progress and exam results</li>
+              </ul>
             </div>
           </div>
-          
-          <DialogFooter className="flex flex-col sm:flex-row gap-3 mt-6">
-            <Button
-              variant="outline"
+          <div className="flex gap-2 border-t border-white/[0.09] bg-[#0A0A11] px-6 py-4">
+            <button
+              type="button"
               onClick={() => setIsDeleteDialogOpen(false)}
               disabled={deleteStudentMutation.isPending}
-              className="flex-1 rounded-2xl border border-white/20 bg-white/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300"
+              className="min-h-[44px] flex-1 rounded-full border border-white/[0.09] bg-[#0F0F18] text-sm font-extrabold text-[#F3F2FA] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#D4FF3F]"
             >
               Cancel
-            </Button>
-            <Button
-              variant="destructive"
+            </button>
+            <button
+              type="button"
               onClick={handleDeleteStudent}
               disabled={deleteStudentMutation.isPending}
-              className="flex-1 gap-2 rounded-2xl hover:shadow-xl transition-all duration-300"
+              className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-full bg-[#FF8FA6] text-sm font-extrabold text-[#0A0A0F] hover:bg-[#ff9fb3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#D4FF3F] disabled:opacity-50"
             >
               {deleteStudentMutation.isPending ? (
-                <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent border-white" />
-                  Deleting...
-                </>
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               ) : (
-                <>
-                  <Trash2 className="h-4 w-4" />
-                  Delete Student
-                </>
+                <Trash2 className="h-4 w-4" aria-hidden />
               )}
-            </Button>
-          </DialogFooter>
+              {deleteStudentMutation.isPending ? "Deleting…" : "Delete student"}
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
     </DashboardLayout>
